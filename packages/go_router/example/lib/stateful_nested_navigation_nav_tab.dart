@@ -2,14 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+final GlobalKey<NavigatorState> _bottomNavANavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'bottomNavA');
+final GlobalKey<NavigatorState> _bottomNavBNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'bottomNavB');
+
 final GlobalKey<NavigatorState> _tabANavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'tabANav');
+    GlobalKey<NavigatorState>(debugLabel: 'tabA');
 final GlobalKey<NavigatorState> _tabBNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'tabBNav');
+    GlobalKey<NavigatorState>(debugLabel: 'tabB');
 
 // This example demonstrates how to setup nested navigation using a
 // BottomNavigationBar, where each tab uses its own persistent navigator, i.e.
@@ -40,62 +44,109 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
       /// Navigator, as specified by the parentNavigatorKey for each root route
       /// (branch). For more customization options for the route branches, see
       /// the default constructor for StatefulShellRoute.
-      StatefulShellRoute.rootRoutes(
-        builder: (BuildContext context, GoRouterState state, _) {
+      StatefulShellRoute(
+        builder: (BuildContext context, GoRouterState state,
+            Widget navigationContainer) {
+          final StatefulShellRouteState shellRouteState =
+              StatefulShellRoute.of(context);
           return ScaffoldWithNavBar(
             index: shellRouteState.index,
-            children: shellRouteState.navigators,
+            navigators: shellRouteState.navigators,
           );
         },
-        routes: <GoRoute>[
-          /// The screen to display as the root in the first tab of the bottom
-          /// navigation bar.
-          GoRoute(
-            parentNavigatorKey: _tabANavigatorKey,
-            path: '/a',
-            builder: (BuildContext context, GoRouterState state) {
-              return const RootScreen(
-                label: 'A',
-                detailsPath: '/a/details',
-              );
-            },
-            routes: <RouteBase>[
-              /// The details screen to display stacked on navigator of the
-              /// first tab. This will cover screen A but not the application
-              /// shell (bottom navigation bar).
-              GoRoute(
-                path: 'details',
-                builder: (BuildContext context, GoRouterState state) {
-                  return const DetailsScreen(
-                    label: 'A',
-                  );
-                },
-              ),
-            ],
+        branches: <ShellRouteBranch>[
+          ShellRouteBranch(
+            navigatorKey: _bottomNavANavigatorKey,
+            rootRoute: StatefulShellRoute.rootRoutes(
+              builder: (BuildContext context, GoRouterState state,
+                  Widget navigationContainer) {
+                final StatefulShellRouteState shellRouteState =
+                    StatefulShellRoute.of(context);
+                return TabScreen(
+                  index: shellRouteState.index,
+                  navigators: shellRouteState.navigators,
+                );
+              },
+              routes: <GoRoute>[
+                GoRoute(
+                  parentNavigatorKey: _tabANavigatorKey,
+                  path: '/a',
+                  builder: (BuildContext context, GoRouterState state) {
+                    return const CounterScreen(
+                      label: 'A',
+                    );
+                  },
+                  routes: <RouteBase>[
+                    /// The details screen to display stacked on navigator of the
+                    /// second tab. This will cover screen B but not the application
+                    /// shell (bottom navigation bar).
+                    GoRoute(
+                      name: 'result',
+                      path: 'result/:param',
+                      builder: (BuildContext context, GoRouterState state) {
+                        return ResultScreen(
+                          label: 'A',
+                          count: int.parse(state.params['count'] ?? '0'),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                GoRoute(
+                  parentNavigatorKey: _tabBNavigatorKey,
+                  path: '/b',
+                  name: 'counter',
+                  builder: (BuildContext context, GoRouterState state) {
+                    return const CounterScreen(
+                      label: 'B',
+                    );
+                  },
+                  routes: <RouteBase>[
+                    /// The details screen to display stacked on navigator of the
+                    /// second tab. This will cover screen B but not the application
+                    /// shell (bottom navigation bar).
+                    GoRoute(
+                      name: 'result',
+                      path: 'result/:param',
+                      builder: (BuildContext context, GoRouterState state) {
+                        return ResultScreen(
+                          label: 'B',
+                          count: int.parse(state.params['count'] ?? '0'),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-
-          /// The screen to display as the root in the second tab of the bottom
-          /// navigation bar.
-          GoRoute(
-            parentNavigatorKey: _tabBNavigatorKey,
-            path: '/b',
-            builder: (BuildContext context, GoRouterState state) {
-              return const RootScreen(
-                label: 'B',
-                detailsPath: '/b/details/1',
-                detailsPath2: '/b/details/2',
-              );
-            },
-            routes: <RouteBase>[
-              /// The details screen to display stacked on navigator of the
-              /// second tab. This will cover screen B but not the application
-              /// shell (bottom navigation bar).
-              GoRoute(
-                path: 'details/:param',
-                builder: (BuildContext context, GoRouterState state) =>
-                    DetailsScreen(label: 'B', param: state.params['param']),
-              ),
-            ],
+          ShellRouteBranch(
+            navigatorKey: _bottomNavBNavigatorKey,
+            // The screen to display as the root in the second tab of the bottom
+            // navigation bar.
+            rootRoute: GoRoute(
+              path: '/c',
+              builder: (BuildContext context, GoRouterState state) {
+                return const CounterScreen(
+                  label: 'C',
+                );
+              },
+              routes: <RouteBase>[
+                /// The details screen to display stacked on navigator of the
+                /// second tab. This will cover screen B but not the application
+                /// shell (bottom navigation bar).
+                GoRoute(
+                  name: 'result',
+                  path: 'result/:param',
+                  builder: (BuildContext context, GoRouterState state) {
+                    return ResultScreen(
+                      label: 'C',
+                      count: int.parse(state.params['count'] ?? '0'),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
 
@@ -126,12 +177,17 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
 class ScaffoldWithNavBar extends StatefulWidget {
   /// Constructs an [ScaffoldWithNavBar].
   const ScaffoldWithNavBar({
-    required this.children,
+    required this.navigators,
     required this.index,
     Key? key,
   }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
-  final List<Widget> children;
+  /// Gets the [Navigator]s for each of the route branches. Note that the
+  /// Navigator for a particular branch may be null if the branch hasn't been
+  /// visited yet.
+  final List<Widget?> navigators;
+
+  /// the index of the currently selected navigator
   final int index;
 
   @override
@@ -167,7 +223,10 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     return Scaffold(
       body: PageView(
         controller: _pageController,
-        children: widget.children,
+        children: widget.navigators
+            .map((Widget? e) => e ?? const SizedBox.expand())
+            .cast<Widget>()
+            .toList(),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -198,12 +257,17 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
 class TabScreen extends StatefulWidget {
   /// Creates a TabScreen
   const TabScreen({
-    required this.children,
+    required this.navigators,
     required this.index,
     Key? key,
   }) : super(key: key);
 
-  final List<Widget> children;
+  /// Gets the [Navigator]s for each of the route branches. Note that the
+  /// Navigator for a particular branch may be null if the branch hasn't been
+  /// visited yet.
+  final List<Widget?> navigators;
+
+  /// the index of the currently selected navigator
   final int index;
 
   @override
@@ -217,7 +281,7 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   void initState() {
     _tabController = TabController(
       initialIndex: widget.index,
-      length: widget.children.length,
+      length: widget.navigators.length,
       vsync: this,
     );
     super.initState();
@@ -249,7 +313,9 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: widget.children,
+            children: widget.navigators
+                .map((Widget? e) => e ?? const SizedBox.expand())
+                .toList(),
           ),
         ),
       ],
@@ -257,98 +323,44 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   }
 }
 
-/// Widget for the root/initial pages in the bottom navigation bar.
-class RootScreen extends StatelessWidget {
-  /// Creates a RootScreen
-  const RootScreen(
-      {required this.label,
-      required this.detailsPath,
-      this.detailsPath2,
-      Key? key})
-      : super(key: key);
-
-  /// The label
-  final String label;
-
-  /// The path to the detail page
-  final String detailsPath;
-
-  /// The path to another detail page
-  final String? detailsPath2;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Tab root - $label'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text('Screen $label',
-                style: Theme.of(context).textTheme.titleLarge),
-            const Padding(padding: EdgeInsets.all(4)),
-            TextButton(
-              onPressed: () {
-                GoRouter.of(context).go(detailsPath);
-              },
-              child: const Text('View details'),
-            ),
-            const Padding(padding: EdgeInsets.all(4)),
-            if (detailsPath2 != null)
-              TextButton(
-                onPressed: () {
-                  GoRouter.of(context).go(detailsPath2!);
-                },
-                child: const Text('View more details'),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The details screen for either the A or B screen.
-class DetailsScreen extends StatefulWidget {
-  /// Constructs a [DetailsScreen].
-  const DetailsScreen({
+/// Counter screen with counter
+class CounterScreen extends StatefulWidget {
+  /// Constructs a [CounterScreen].
+  const CounterScreen({
     required this.label,
-    this.param,
     Key? key,
   }) : super(key: key);
 
   /// The label to display in the center of the screen.
   final String label;
 
-  /// Optional param
-  final String? param;
-
   @override
-  State<StatefulWidget> createState() => DetailsScreenState();
+  State<StatefulWidget> createState() => CounterScreenState();
 }
 
 /// The state for DetailsScreen
-class DetailsScreenState extends State<DetailsScreen> {
+class CounterScreenState extends State<CounterScreen> {
   int _counter = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Details Screen - ${widget.label}'),
+        title: const Text('Root Screen'),
       ),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            if (widget.param != null)
-              Text('Parameter: ${widget.param!}',
-                  style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              widget.label,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const Padding(padding: EdgeInsets.all(4)),
-            Text('Details for ${widget.label} - Counter: $_counter',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Counter: $_counter',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const Padding(padding: EdgeInsets.all(4)),
             TextButton(
               onPressed: () {
@@ -357,6 +369,52 @@ class DetailsScreenState extends State<DetailsScreen> {
                 });
               },
               child: const Text('Increment counter'),
+            ),
+            const Padding(padding: EdgeInsets.all(4)),
+            TextButton(
+              onPressed: () {
+                context.goNamed(
+                  'result',
+                  params: <String, String>{'count': _counter.toString()},
+                );
+              },
+              child: const Text('Navigate'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The result screen for either the A, B or C screen.
+class ResultScreen extends StatelessWidget {
+  /// Constructs a [ResultScreen].
+  const ResultScreen({
+    required this.label,
+    required this.count,
+    Key? key,
+  }) : super(key: key);
+
+  /// The label to display in the center of the screen.
+  final String label;
+
+  /// The counter to display in the center of the screen.
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Result Screen'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              '$label counted to $count',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
           ],
         ),
