@@ -431,6 +431,7 @@ class ResultScreen extends StatelessWidget {
       body: ResultView(
         label: label,
         count: count,
+        renderBackButton: false,
       ),
     );
   }
@@ -442,6 +443,7 @@ class ResultView extends StatelessWidget {
   const ResultView({
     required this.label,
     required this.count,
+    this.renderBackButton = true,
     Key? key,
   }) : super(key: key);
 
@@ -451,18 +453,36 @@ class ResultView extends StatelessWidget {
   /// The counter to display in the center of the screen.
   final int count;
 
+  /// Whether to render the back button.
+  final bool renderBackButton;
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Text(
-            '$label counted to $count',
-            style: Theme.of(context).textTheme.titleLarge,
+    return Stack(
+      children: <Widget>[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              color: Theme.of(context).primaryColor,
+            ),
+            onPressed: () => context.pop(),
           ),
-        ],
-      ),
+        ),
+        Positioned.fill(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text(
+                '$label counted to $count',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
