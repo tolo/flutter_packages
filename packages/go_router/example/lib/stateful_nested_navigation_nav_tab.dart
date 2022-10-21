@@ -58,8 +58,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
           ShellRouteBranch(
             navigatorKey: _bottomNavANavigatorKey,
             rootRoute: StatefulShellRoute.rootRoutes(
-              builder: (BuildContext context, GoRouterState state,
-                  Widget navigationContainer) {
+              builder: (BuildContext context, GoRouterState state, _) {
                 final StatefulShellRouteState shellRouteState =
                     StatefulShellRoute.of(context);
                 return TabScreen(
@@ -72,7 +71,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   parentNavigatorKey: _tabANavigatorKey,
                   path: '/a',
                   builder: (BuildContext context, GoRouterState state) {
-                    return const CounterScreen(
+                    return const CounterView(
                       label: 'A',
                     );
                   },
@@ -81,10 +80,9 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     /// second tab. This will cover screen B but not the application
                     /// shell (bottom navigation bar).
                     GoRoute(
-                      name: 'result',
-                      path: 'result/:param',
+                      path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
-                        return ResultScreen(
+                        return ResultView(
                           label: 'A',
                           count: int.parse(state.params['count'] ?? '0'),
                         );
@@ -97,7 +95,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   path: '/b',
                   name: 'counter',
                   builder: (BuildContext context, GoRouterState state) {
-                    return const CounterScreen(
+                    return const CounterView(
                       label: 'B',
                     );
                   },
@@ -106,10 +104,9 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     /// second tab. This will cover screen B but not the application
                     /// shell (bottom navigation bar).
                     GoRoute(
-                      name: 'result',
-                      path: 'result/:param',
+                      path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
-                        return ResultScreen(
+                        return ResultView(
                           label: 'B',
                           count: int.parse(state.params['count'] ?? '0'),
                         );
@@ -136,8 +133,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                 /// second tab. This will cover screen B but not the application
                 /// shell (bottom navigation bar).
                 GoRoute(
-                  name: 'result',
-                  path: 'result/:param',
+                  path: 'result/:count',
                   builder: (BuildContext context, GoRouterState state) {
                     return ResultScreen(
                       label: 'C',
@@ -301,30 +297,36 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        TabBar(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Tab Screen'),
+        bottom: TabBar(
           controller: _tabController,
           tabs: const <Tab>[
             Tab(child: Text('One')),
             Tab(child: Text('Two')),
           ],
+          onTap: (int index) {
+            if (index == 0) {
+              GoRouter.of(context).go('/a');
+            } else {
+              GoRouter.of(context).go('/b');
+            }
+          },
         ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: widget.navigators
-                .map((Widget? e) => e ?? const SizedBox.expand())
-                .toList(),
-          ),
-        ),
-      ],
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: widget.navigators
+            .map((Widget? e) => e ?? const SizedBox.expand())
+            .toList(),
+      ),
     );
   }
 }
 
 /// Counter screen with counter
-class CounterScreen extends StatefulWidget {
+class CounterScreen extends StatelessWidget {
   /// Constructs a [CounterScreen].
   const CounterScreen({
     required this.label,
@@ -335,53 +337,71 @@ class CounterScreen extends StatefulWidget {
   final String label;
 
   @override
-  State<StatefulWidget> createState() => CounterScreenState();
-}
-
-/// The state for DetailsScreen
-class CounterScreenState extends State<CounterScreen> {
-  int _counter = 0;
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Root Screen'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              widget.label,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Padding(padding: EdgeInsets.all(4)),
-            Text(
-              'Counter: $_counter',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Padding(padding: EdgeInsets.all(4)),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _counter++;
-                });
-              },
-              child: const Text('Increment counter'),
-            ),
-            const Padding(padding: EdgeInsets.all(4)),
-            TextButton(
-              onPressed: () {
-                context.goNamed(
-                  'result',
-                  params: <String, String>{'count': _counter.toString()},
-                );
-              },
-              child: const Text('Navigate'),
-            ),
-          ],
-        ),
+      body: CounterView(
+        label: label,
+      ),
+    );
+  }
+}
+
+/// Counter view with counter
+class CounterView extends StatefulWidget {
+  /// Constructs a [CounterView].
+  const CounterView({
+    required this.label,
+    Key? key,
+  }) : super(key: key);
+
+  /// The label to display in the center of the screen.
+  final String label;
+
+  @override
+  State<StatefulWidget> createState() => CounterViewState();
+}
+
+/// The state for CounterView
+class CounterViewState extends State<CounterView> {
+  int _counter = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            widget.label,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const Padding(padding: EdgeInsets.all(4)),
+          Text(
+            'Counter: $_counter',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const Padding(padding: EdgeInsets.all(4)),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _counter++;
+              });
+            },
+            child: const Text('Increment counter'),
+          ),
+          const Padding(padding: EdgeInsets.all(4)),
+          TextButton(
+            onPressed: () {
+              context.go(
+                '${GoRouter.of(context).location}/result/$_counter',
+              );
+            },
+            child: const Text('Navigate'),
+          ),
+        ],
       ),
     );
   }
@@ -408,16 +428,40 @@ class ResultScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Result Screen'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              '$label counted to $count',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ],
-        ),
+      body: ResultView(
+        label: label,
+        count: count,
+      ),
+    );
+  }
+}
+
+/// The result view for either the A, B or C screen.
+class ResultView extends StatelessWidget {
+  /// Constructs a [ResultView].
+  const ResultView({
+    required this.label,
+    required this.count,
+    Key? key,
+  }) : super(key: key);
+
+  /// The label to display in the center of the screen.
+  final String label;
+
+  /// The counter to display in the center of the screen.
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            '$label counted to $count',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ],
       ),
     );
   }
