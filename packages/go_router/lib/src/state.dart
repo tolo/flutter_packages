@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'configuration.dart';
+import 'router.dart';
 
 /// The route state during routing.
 ///
@@ -84,69 +86,121 @@ class GoRouterState {
 }
 
 /// The current state for a [StatefulShellRoute].
+@immutable
 class StatefulShellRouteState {
   /// Constructs a [StatefulShellRouteState].
-  StatefulShellRouteState({
+  const StatefulShellRouteState({
+    required Function(String, Object?) go,
     required this.route,
-    required this.navigationBranchState,
+    required this.branchState,
     required this.index,
-  });
+  }) : _go = go;
 
   /// The associated [StatefulShellRoute]
   final StatefulShellRoute route;
 
   /// The state for all separate route branches associated with a
   /// [StatefulShellRoute].
-  final List<ShellRouteBranchState> navigationBranchState;
+  final List<ShellRouteBranchState> branchState;
 
   /// The index of the currently active route branch.
   final int index;
 
-  /// Gets the current location from the [topRouteState] or falls back to
-  /// the root path of the associated [route].
-  String get location => navigationBranchState[index].location;
+  final Function(String, Object?) _go;
 
-  /// Gets the [Navigator]s for each of the route branches. Note that the
-  /// Navigator for a particular branch may be null if the branch hasn't been
-  /// visited yet.
-  List<Widget?> get navigators => navigationBranchState
-      .map((ShellRouteBranchState e) => e.navigator)
-      .toList();
+  /// Gets the [Navigator]s for each of the route branches.
+  ///
+  /// Note that the Navigator for a particular branch may be null if the branch
+  /// hasn't been visited yet.
+  List<Widget?> get navigators =>
+      branchState.map((ShellRouteBranchState e) => e.navigator).toList();
+
+  /// Navigate to the current location of the branch with the provided index.
+  ///
+  /// This method will switch the currently active [Navigator] for the
+  /// [StatefulShellRoute] by navigating to the current location of the
+  /// specified branch, using the method [GoRouter.go].
+  void goBranch(int index, {Object? extra}) {
+    _go(branchState[index]._location, extra);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    }
+    if (other is! StatefulShellRouteState) {
+      return false;
+    }
+    return other.route == route &&
+        listEquals(other.branchState, branchState) &&
+        other.index == index;
+  }
+
+  @override
+  int get hashCode => Object.hash(route, branchState, index);
 }
 
 /// The current state for a particular route branch
 /// ([ShellRouteBranch]) of a [StatefulShellRoute].
+@immutable
 class ShellRouteBranchState {
   /// Constructs a [ShellRouteBranchState].
-  ShellRouteBranchState({
-    required this.navigationItem,
-    required this.rootRoutePath,
+  const ShellRouteBranchState({
+    required this.routeBranch,
+    required String rootRoutePath,
     this.navigator,
-    this.topRouteState,
-  });
+    String? lastLocation,
+  })  : _lastLocation = lastLocation,
+        _rootRoutePath = rootRoutePath;
+
+  /// Constructs a copy of this [ShellRouteBranchState], with updated values for
+  /// some of the fields.
+  ShellRouteBranchState copy({Navigator? navigator, String? lastLocation}) {
+    return ShellRouteBranchState(
+      routeBranch: routeBranch,
+      rootRoutePath: _rootRoutePath,
+      navigator: navigator ?? this.navigator,
+      lastLocation: lastLocation ?? _lastLocation,
+    );
+  }
 
   /// The associated [ShellRouteBranch]
-  final ShellRouteBranch navigationItem;
-
-  /// The full path at which root route for the route branch is reachable.
-  final String rootRoutePath;
+  final ShellRouteBranch routeBranch;
 
   /// The [Navigator] for this route branch in a [StatefulShellRoute]. This
   /// field will typically not be set until this route tree has been navigated
   /// to at least once.
   final Navigator? navigator;
 
-  /// The [GoRouterState] for the top of the current navigation stack.
-  final GoRouterState? topRouteState;
+  /// Gets the defaultLocation specified in [routeBranch] or falls back to
+  /// the root path of the associated [rootRoute].
+  String get _defaultLocation => routeBranch.defaultLocation ?? _rootRoutePath;
 
-  /// Gets the defaultLocation specified in [navigationItem] or falls back to
-  /// the root path of the associated [route].
-  String get defaultLocation => navigationItem.defaultLocation ?? rootRoutePath;
+  final String? _lastLocation;
 
-  /// Gets the current location from the [topRouteState] or falls back to
-  /// [defaultLocation].
-  String get location => topRouteState?.location ?? defaultLocation;
+  /// The full path at which root route for the route branch is reachable.
+  final String _rootRoutePath;
 
-  /// The root route for the route branch.
-  RouteBase get route => navigationItem.rootRoute;
+  /// Gets the current location for this branch or falls back to the default
+  /// location () if this branch hasn't been visited yet.
+  String get _location => _lastLocation ?? _defaultLocation;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    }
+    if (other is! ShellRouteBranchState) {
+      return false;
+    }
+    return other.routeBranch == routeBranch &&
+        other._rootRoutePath == _rootRoutePath &&
+        other.navigator == navigator &&
+        other._lastLocation == _lastLocation;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(routeBranch, _rootRoutePath, navigator, _lastLocation);
 }
