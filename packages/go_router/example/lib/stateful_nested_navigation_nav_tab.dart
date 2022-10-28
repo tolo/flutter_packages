@@ -39,11 +39,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
   final GoRouter _router = GoRouter(
     initialLocation: '/a',
     routes: <RouteBase>[
-      /// Application shell - wraps the below routes in a scaffold with
-      /// a bottom tab navigator (ScaffoldWithNavBar). Each tab will use its own
-      /// Navigator, as specified by the parentNavigatorKey for each root route
-      /// (branch). For more customization options for the route branches, see
-      /// the default constructor for StatefulShellRoute.
       StatefulShellRoute(
         builder: (BuildContext context, GoRouterState state,
             Widget navigationContainer) {
@@ -57,6 +52,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
         branches: <ShellRouteBranch>[
           ShellRouteBranch(
             navigatorKey: _bottomNavANavigatorKey,
+            defaultLocation: '/a',
             rootRoute: StatefulShellRoute.rootRoutes(
               builder: (BuildContext context, GoRouterState state, _) {
                 final StatefulShellRouteState shellRouteState =
@@ -93,7 +89,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                 GoRoute(
                   parentNavigatorKey: _tabBNavigatorKey,
                   path: '/b',
-                  name: 'counter',
                   builder: (BuildContext context, GoRouterState state) {
                     return const CounterView(
                       label: 'B',
@@ -119,6 +114,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
           ),
           ShellRouteBranch(
             navigatorKey: _bottomNavBNavigatorKey,
+            defaultLocation: '/c',
             // The screen to display as the root in the second tab of the bottom
             // navigation bar.
             rootRoute: GoRoute(
@@ -202,9 +198,9 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
     );
     pageController.addListener(() {
       final StatefulShellRouteState shellState = StatefulShellRoute.of(context);
-      GoRouter.of(context).go(
-        shellState.navigationBranchState[index].location,
-      );
+      final String location =
+          shellState.branchState[index].routeBranch.defaultLocation!;
+      GoRouter.of(context).go(location);
     });
     super.initState();
   }
