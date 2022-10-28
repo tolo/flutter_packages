@@ -191,38 +191,37 @@ class ScaffoldWithNavBar extends StatefulWidget {
 }
 
 class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
-  late PageController _pageController;
+  late PageController pageController;
+  late int index;
 
   @override
   void initState() {
-    _pageController = PageController(
-      initialPage: widget.index,
+    index = widget.index;
+    pageController = PageController(
+      initialPage: index,
     );
+    pageController.addListener(() {
+      final StatefulShellRouteState shellState = StatefulShellRoute.of(context);
+      GoRouter.of(context).go(
+        shellState.navigationBranchState[index].location,
+      );
+    });
     super.initState();
   }
 
   @override
-  void didUpdateWidget(covariant ScaffoldWithNavBar oldWidget) {
-    if (oldWidget.index != widget.index) {
-      _pageController.animateToPage(
-        widget.index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final StatefulShellRouteState shellState = StatefulShellRoute.of(context);
     return Scaffold(
       body: PageView(
-        controller: _pageController,
+        controller: pageController,
         children: widget.navigators
             .map((Widget? e) => e ?? const SizedBox.expand())
             .cast<Widget>()
             .toList(),
+        onPageChanged: (int value) {
+          index = value;
+          setState(() {});
+        },
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -235,17 +234,16 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
             label: 'Section B',
           ),
         ],
-        currentIndex: widget.index,
-        onTap: (int tappedIndex) => _onItemTapped(
-          context,
-          shellState.navigationBranchState[tappedIndex],
-        ),
+        currentIndex: index,
+        onTap: (int index) {
+          pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        },
       ),
     );
-  }
-
-  void _onItemTapped(BuildContext context, ShellRouteBranchState routeState) {
-    GoRouter.of(context).go(routeState.location);
   }
 }
 
@@ -386,9 +384,8 @@ class CounterViewState extends State<CounterView> {
           const Padding(padding: EdgeInsets.all(4)),
           TextButton(
             onPressed: () {
-              setState(() {
-                _counter++;
-              });
+              _counter++;
+              setState(() {});
             },
             child: const Text('Increment counter'),
           ),
