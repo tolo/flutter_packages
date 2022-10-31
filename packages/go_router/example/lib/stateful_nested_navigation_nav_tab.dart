@@ -168,7 +168,8 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
 
 /// Builds the "shell" for the app by building a Scaffold with a
 /// BottomNavigationBar, where [child] is placed in the body of the Scaffold.
-class ScaffoldWithNavBar extends StatefulWidget {
+class ScaffoldWithNavBar extends StatefulWidget
+    implements GoRouterShellStatefulWidget {
   /// Constructs an [ScaffoldWithNavBar].
   const ScaffoldWithNavBar({
     required this.branchState,
@@ -177,56 +178,19 @@ class ScaffoldWithNavBar extends StatefulWidget {
   }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
   /// Gets the [ShellRouteBranchState]s for each of the route branches.
+  @override
   final List<ShellRouteBranchState> branchState;
 
   /// the index of the currently selected navigator
+  @override
   final int index;
 
   @override
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
 }
 
-class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
-    with TickerProviderStateMixin {
-  late TabController tabController;
-  late int index;
-
-  @override
-  void initState() {
-    index = widget.index;
-    super.initState();
-    tabController = TabController(
-      initialIndex: index,
-      length: widget.branchState.length,
-      vsync: this,
-    );
-    tabController.addListener(_tabListener);
-  }
-
-  void _tabListener() {
-    if (tabController.indexIsChanging) {
-      final String location =
-          widget.branchState[tabController.index].routeBranch.defaultLocation!;
-      GoRouter.of(context).go(location);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant ScaffoldWithNavBar oldWidget) {
-    if (oldWidget.index != widget.index) {
-      if (widget.index != index) {
-        index = widget.index;
-        setState(() {});
-        tabController.animateTo(
-          widget.index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
+class _ScaffoldWithNavBarState
+    extends GoRouterShellStatefulWidgetState<ScaffoldWithNavBar> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -258,16 +222,10 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
       ),
     );
   }
-
-  @override
-  void dispose() {
-    tabController.removeListener(_tabListener);
-    super.dispose();
-  }
 }
 
 /// Widget for the tab screen in the first item of the bottom navigation bar.
-class TabScreen extends StatefulWidget {
+class TabScreen extends StatefulWidget implements GoRouterShellStatefulWidget {
   /// Creates a TabScreen
   const TabScreen({
     required this.branchState,
@@ -276,55 +234,18 @@ class TabScreen extends StatefulWidget {
   }) : super(key: key);
 
   /// Gets the [ShellRouteBranchState]s for each of the route branches.
+  @override
   final List<ShellRouteBranchState> branchState;
 
   /// the index of the currently selected navigator
+  @override
   final int index;
 
   @override
   State<TabScreen> createState() => _TabScreenState();
 }
 
-class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
-  late TabController tabController;
-  late int index;
-
-  @override
-  void initState() {
-    index = widget.index;
-    super.initState();
-    tabController = TabController(
-      initialIndex: widget.index,
-      length: widget.branchState.length,
-      vsync: this,
-    );
-    tabController.addListener(_tabListener);
-  }
-
-  void _tabListener() {
-    if (tabController.indexIsChanging) {
-      final String location =
-          widget.branchState[tabController.index].routeBranch.defaultLocation!;
-      GoRouter.of(context).go(location);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant TabScreen oldWidget) {
-    if (oldWidget.index != widget.index) {
-      if (widget.index != index) {
-        index = widget.index;
-        setState(() {});
-        tabController.animateTo(
-          widget.index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
+class _TabScreenState extends GoRouterShellStatefulWidgetState<TabScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -354,12 +275,6 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
             .toList(),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    tabController.removeListener(_tabListener);
-    super.dispose();
   }
 }
 
@@ -522,5 +437,63 @@ class ResultView extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// Widget for the tab screen in the first item of the bottom navigation bar.
+abstract class GoRouterShellStatefulWidget implements StatefulWidget {
+  /// Gets the [ShellRouteBranchState]s for each of the route branches.
+  List<ShellRouteBranchState> get branchState;
+
+  /// the index of the currently selected navigator
+  int get index;
+}
+
+abstract class GoRouterShellStatefulWidgetState<
+        T extends GoRouterShellStatefulWidget> extends State<T>
+    with TickerProviderStateMixin {
+  late TabController tabController;
+  late int index;
+
+  @override
+  void initState() {
+    index = widget.index;
+    super.initState();
+    tabController = TabController(
+      initialIndex: widget.index,
+      length: widget.branchState.length,
+      vsync: this,
+    );
+    tabController.addListener(_tabListener);
+  }
+
+  void _tabListener() {
+    if (tabController.indexIsChanging) {
+      final String location =
+          widget.branchState[tabController.index].routeBranch.defaultLocation!;
+      GoRouter.of(context).go(location);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant T oldWidget) {
+    if (oldWidget.index != widget.index) {
+      if (widget.index != index) {
+        index = widget.index;
+        setState(() {});
+        tabController.animateTo(
+          widget.index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  void dispose() {
+    tabController.removeListener(_tabListener);
+    super.dispose();
   }
 }
