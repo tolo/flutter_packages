@@ -52,6 +52,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   parentNavigatorKey: _tabANavigatorKey,
                   path: '/a',
                   builder: (BuildContext context, GoRouterState state) {
+                    debugPrint('### detected route: /a');
                     return const CounterView(
                       label: 'A',
                     );
@@ -63,6 +64,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     GoRoute(
                       path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
+                        debugPrint('### detected route: /a/result:count');
                         return ResultView(
                           label: 'A',
                           count: int.parse(state.params['count'] ?? '0'),
@@ -75,6 +77,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   parentNavigatorKey: _tabBNavigatorKey,
                   path: '/b',
                   builder: (BuildContext context, GoRouterState state) {
+                    debugPrint('### detected route: /b');
                     return const CounterView(
                       label: 'B',
                     );
@@ -86,6 +89,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     GoRoute(
                       path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
+                        debugPrint('### detected route: /b/result:count');
                         return ResultView(
                           label: 'B',
                           count: int.parse(state.params['count'] ?? '0'),
@@ -113,6 +117,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
             rootRoute: GoRoute(
               path: '/c',
               builder: (BuildContext context, GoRouterState state) {
+                debugPrint('### detected route: /c');
                 return const CounterScreen(
                   label: 'C',
                 );
@@ -124,6 +129,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                 GoRoute(
                   path: 'result/:count',
                   builder: (BuildContext context, GoRouterState state) {
+                    debugPrint('### detected route: /c/result:count');
                     return ResultScreen(
                       label: 'C',
                       count: int.parse(state.params['count'] ?? '0'),
@@ -468,9 +474,15 @@ abstract class GoRouterShellStatefulWidgetState<
   }
 
   void _tabListener() {
-    if (tabController.indexIsChanging) {
-      final String location =
-          widget.branchState[tabController.index].routeBranch.defaultLocation!;
+    if (tabController.index != index) {
+      index = tabController.index;
+      setState(() {});
+      final String? location =
+          widget.branchState[tabController.index].routeBranch.defaultLocation;
+      if (location == null) {
+        assert(false, 'No default location for branch');
+        return;
+      }
       GoRouter.of(context).go(location);
     }
   }
