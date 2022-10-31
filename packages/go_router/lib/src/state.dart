@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'configuration.dart';
-import 'router.dart';
+import 'matching.dart';
 
 /// The route state during routing.
 ///
@@ -85,16 +85,22 @@ class GoRouterState {
   }
 }
 
-/// The current state for a [StatefulShellRoute].
+/// The snapshot of the current state of a [StatefulShellRoute].
+///
+/// Note that this an immutable class, that represents the snapshot of the state
+/// of a StatefulShellRoute at a given point in time. Therefore, instances of
+/// this object should not be stored, but instead fetched fresh when needed,
+/// using the method [StatefulShellRoute.of].
 @immutable
 class StatefulShellRouteState {
   /// Constructs a [StatefulShellRouteState].
   const StatefulShellRouteState({
-    required Function(String, Object?) go,
+    required Function(ShellRouteBranchState, RouteMatchList?)
+        switchActiveBranch,
     required this.route,
     required this.branchState,
     required this.index,
-  }) : _go = go;
+  }) : _switchActiveBranch = switchActiveBranch;
 
   /// The associated [StatefulShellRoute]
   final StatefulShellRoute route;
@@ -106,7 +112,7 @@ class StatefulShellRouteState {
   /// The index of the currently active route branch.
   final int index;
 
-  final Function(String, Object?) _go;
+  final Function(ShellRouteBranchState, RouteMatchList?) _switchActiveBranch;
 
   /// Gets the [Navigator]s for each of the route branches.
   ///
@@ -118,10 +124,13 @@ class StatefulShellRouteState {
   /// Navigate to the current location of the branch with the provided index.
   ///
   /// This method will switch the currently active [Navigator] for the
-  /// [StatefulShellRoute] by navigating to the current location of the
-  /// specified branch, using the method [GoRouter.go].
-  void goBranch(int index, {Object? extra}) {
-    _go(branchState[index]._location, extra);
+  /// [StatefulShellRoute] by replacing the current navigation stack with the
+  /// one of the route branch at the provided index. If resetLocation is true,
+  /// the branch will be reset to its default location (see
+  /// [ShellRouteBranchState.defaultLocation]).
+  void goBranch(int index, {bool resetLocation = false}) {
+    _switchActiveBranch(branchState[index],
+        resetLocation ? null : branchState[index]._matchList);
   }
 
   @override
@@ -141,8 +150,14 @@ class StatefulShellRouteState {
   int get hashCode => Object.hash(route, branchState, index);
 }
 
-/// The current state for a particular route branch
-/// ([ShellRouteBranch]) of a [StatefulShellRoute].
+/// The snapshot of the current state for a particular route branch
+/// ([ShellRouteBranch]) in a [StatefulShellRoute].
+///
+/// Note that this an immutable class, that represents the snapshot of the state
+/// of a ShellRouteBranchState at a given point in time. Therefore, instances of
+/// this object should not be stored, but instead fetched fresh when needed,
+/// via the [StatefulShellRouteState] returned by the method
+/// [StatefulShellRoute.of].
 @immutable
 class ShellRouteBranchState {
   /// Constructs a [ShellRouteBranchState].
@@ -150,41 +165,40 @@ class ShellRouteBranchState {
     required this.routeBranch,
     required String rootRoutePath,
     this.navigator,
-    String? lastLocation,
-  })  : _lastLocation = lastLocation,
+    RouteMatchList? matchList,
+  })  : _matchList = matchList,
         _rootRoutePath = rootRoutePath;
 
   /// Constructs a copy of this [ShellRouteBranchState], with updated values for
   /// some of the fields.
-  ShellRouteBranchState copy({Navigator? navigator, String? lastLocation}) {
+  ShellRouteBranchState copy(
+      {Navigator? navigator, RouteMatchList? matchList}) {
     return ShellRouteBranchState(
       routeBranch: routeBranch,
       rootRoutePath: _rootRoutePath,
       navigator: navigator ?? this.navigator,
-      lastLocation: lastLocation ?? _lastLocation,
+      matchList: matchList ?? _matchList,
     );
   }
 
   /// The associated [ShellRouteBranch]
   final ShellRouteBranch routeBranch;
 
-  /// The [Navigator] for this route branch in a [StatefulShellRoute]. This
-  /// field will typically not be set until this route tree has been navigated
+  /// The [Navigator] for this route branch in a [StatefulShellRoute].
+  ///
+  /// This field will typically not be set until this route tree has been navigated
   /// to at least once.
   final Navigator? navigator;
 
   /// Gets the defaultLocation specified in [routeBranch] or falls back to
-  /// the root path of the associated [rootRoute].
-  String get _defaultLocation => routeBranch.defaultLocation ?? _rootRoutePath;
+  /// the path of the root route of the branch.
+  String get defaultLocation => routeBranch.defaultLocation ?? _rootRoutePath;
 
-  final String? _lastLocation;
+  /// The current navigation stack for the branch.
+  final RouteMatchList? _matchList;
 
   /// The full path at which root route for the route branch is reachable.
   final String _rootRoutePath;
-
-  /// Gets the current location for this branch or falls back to the default
-  /// location () if this branch hasn't been visited yet.
-  String get _location => _lastLocation ?? _defaultLocation;
 
   @override
   bool operator ==(Object other) {
@@ -197,10 +211,10 @@ class ShellRouteBranchState {
     return other.routeBranch == routeBranch &&
         other._rootRoutePath == _rootRoutePath &&
         other.navigator == navigator &&
-        other._lastLocation == _lastLocation;
+        other._matchList == _matchList;
   }
 
   @override
   int get hashCode =>
-      Object.hash(routeBranch, _rootRoutePath, navigator, _lastLocation);
+      Object.hash(routeBranch, _rootRoutePath, navigator, _matchList);
 }
