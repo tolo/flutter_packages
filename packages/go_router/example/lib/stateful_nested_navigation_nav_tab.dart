@@ -100,7 +100,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     StatefulShellRoute.of(context);
                 return TabScreen(
                   index: shellRouteState.index,
-                  navigators: shellRouteState.navigators,
+                  branchState: shellRouteState.branchState,
                 );
               },
             ),
@@ -147,7 +147,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
               StatefulShellRoute.of(context);
           return ScaffoldWithNavBar(
             index: shellRouteState.index,
-            navigators: shellRouteState.navigators,
+            branchState: shellRouteState.branchState,
           );
         },
       ),
@@ -171,15 +171,13 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
 class ScaffoldWithNavBar extends StatefulWidget {
   /// Constructs an [ScaffoldWithNavBar].
   const ScaffoldWithNavBar({
-    required this.navigators,
+    required this.branchState,
     required this.index,
     Key? key,
   }) : super(key: key ?? const ValueKey<String>('ScaffoldWithNavBar'));
 
-  /// Gets the [Navigator]s for each of the route branches. Note that the
-  /// Navigator for a particular branch may be null if the branch hasn't been
-  /// visited yet.
-  final List<Widget?> navigators;
+  /// Gets the [ShellRouteBranchState]s for each of the route branches.
+  final List<ShellRouteBranchState> branchState;
 
   /// the index of the currently selected navigator
   final int index;
@@ -188,38 +186,55 @@ class ScaffoldWithNavBar extends StatefulWidget {
   State<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
 }
 
-class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
-  late PageController pageController;
+class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar>
+    with TickerProviderStateMixin {
+  late TabController tabController;
   late int index;
 
   @override
   void initState() {
     index = widget.index;
-    pageController = PageController(
-      initialPage: index,
-    );
-    pageController.addListener(() {
-      final StatefulShellRouteState shellState = StatefulShellRoute.of(context);
-      final String location =
-          shellState.branchState[index].routeBranch.defaultLocation!;
-      GoRouter.of(context).go(location);
-    });
     super.initState();
+    tabController = TabController(
+      initialIndex: index,
+      length: widget.branchState.length,
+      vsync: this,
+    );
+    tabController.addListener(_tabListener);
+  }
+
+  void _tabListener() {
+    if (tabController.indexIsChanging) {
+      final String location =
+          widget.branchState[tabController.index].routeBranch.defaultLocation!;
+      GoRouter.of(context).go(location);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ScaffoldWithNavBar oldWidget) {
+    if (oldWidget.index != widget.index) {
+      if (widget.index != index) {
+        index = widget.index;
+        setState(() {});
+        tabController.animateTo(
+          widget.index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    }
+    super.didUpdateWidget(oldWidget);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: PageView(
-        controller: pageController,
-        children: widget.navigators
-            .map((Widget? e) => e ?? const SizedBox.expand())
-            .cast<Widget>()
+      body: TabBarView(
+        controller: tabController,
+        children: widget.branchState
+            .map((ShellRouteBranchState e) => e.navigator!)
             .toList(),
-        onPageChanged: (int value) {
-          index = value;
-          setState(() {});
-        },
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -234,7 +249,7 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
         ],
         currentIndex: index,
         onTap: (int index) {
-          pageController.animateToPage(
+          tabController.animateTo(
             index,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -243,21 +258,25 @@ class _ScaffoldWithNavBarState extends State<ScaffoldWithNavBar> {
       ),
     );
   }
+
+  @override
+  void dispose() {
+    tabController.removeListener(_tabListener);
+    super.dispose();
+  }
 }
 
 /// Widget for the tab screen in the first item of the bottom navigation bar.
 class TabScreen extends StatefulWidget {
   /// Creates a TabScreen
   const TabScreen({
-    required this.navigators,
+    required this.branchState,
     required this.index,
     Key? key,
   }) : super(key: key);
 
-  /// Gets the [Navigator]s for each of the route branches. Note that the
-  /// Navigator for a particular branch may be null if the branch hasn't been
-  /// visited yet.
-  final List<Widget?> navigators;
+  /// Gets the [ShellRouteBranchState]s for each of the route branches.
+  final List<ShellRouteBranchState> branchState;
 
   /// the index of the currently selected navigator
   final int index;
@@ -267,26 +286,41 @@ class TabScreen extends StatefulWidget {
 }
 
 class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
+  late TabController tabController;
+  late int index;
 
   @override
   void initState() {
-    _tabController = TabController(
+    index = widget.index;
+    super.initState();
+    tabController = TabController(
       initialIndex: widget.index,
-      length: widget.navigators.length,
+      length: widget.branchState.length,
       vsync: this,
     );
-    super.initState();
+    tabController.addListener(_tabListener);
+  }
+
+  void _tabListener() {
+    if (tabController.indexIsChanging) {
+      final String location =
+          widget.branchState[tabController.index].routeBranch.defaultLocation!;
+      GoRouter.of(context).go(location);
+    }
   }
 
   @override
   void didUpdateWidget(covariant TabScreen oldWidget) {
     if (oldWidget.index != widget.index) {
-      _tabController.animateTo(
-        widget.index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
+      if (widget.index != index) {
+        index = widget.index;
+        setState(() {});
+        tabController.animateTo(
+          widget.index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
     }
     super.didUpdateWidget(oldWidget);
   }
@@ -295,9 +329,11 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tab Screen'),
+        title: Text(
+          index == 0 ? 'Tab screen (A)' : 'Tab screen (B)',
+        ),
         bottom: TabBar(
-          controller: _tabController,
+          controller: tabController,
           tabs: const <Tab>[
             Tab(child: Text('One')),
             Tab(child: Text('Two')),
@@ -312,12 +348,18 @@ class _TabScreenState extends State<TabScreen> with TickerProviderStateMixin {
         ),
       ),
       body: TabBarView(
-        controller: _tabController,
-        children: widget.navigators
-            .map((Widget? e) => e ?? const SizedBox.expand())
+        controller: tabController,
+        children: widget.branchState
+            .map((ShellRouteBranchState e) => e.navigator!)
             .toList(),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    tabController.removeListener(_tabListener);
+    super.dispose();
   }
 }
 
@@ -336,7 +378,7 @@ class CounterScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Root Screen'),
+        title: Text('$label - Root Screen'),
       ),
       body: CounterView(
         label: label,
@@ -455,16 +497,17 @@ class ResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: <Widget>[
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new,
-              color: Theme.of(context).primaryColor,
+        if (renderBackButton)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                color: Theme.of(context).primaryColor,
+              ),
+              onPressed: () => context.pop(),
             ),
-            onPressed: () => context.pop(),
           ),
-        ),
         Positioned.fill(
           child: Column(
             mainAxisSize: MainAxisSize.min,
