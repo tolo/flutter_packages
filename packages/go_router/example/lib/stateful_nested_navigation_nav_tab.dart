@@ -40,28 +40,13 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
     initialLocation: '/a',
     routes: <RouteBase>[
       StatefulShellRoute(
-        builder: (BuildContext context, GoRouterState state,
-            Widget navigationContainer) {
-          final StatefulShellRouteState shellRouteState =
-              StatefulShellRoute.of(context);
-          return ScaffoldWithNavBar(
-            index: shellRouteState.index,
-            navigators: shellRouteState.navigators,
-          );
-        },
+        preloadBranches: true,
         branches: <ShellRouteBranch>[
           ShellRouteBranch(
             navigatorKey: _bottomNavANavigatorKey,
             defaultLocation: '/a',
             rootRoute: StatefulShellRoute.rootRoutes(
-              builder: (BuildContext context, GoRouterState state, _) {
-                final StatefulShellRouteState shellRouteState =
-                    StatefulShellRoute.of(context);
-                return TabScreen(
-                  index: shellRouteState.index,
-                  navigators: shellRouteState.navigators,
-                );
-              },
+              preloadBranches: true,
               routes: <GoRoute>[
                 GoRoute(
                   parentNavigatorKey: _tabANavigatorKey,
@@ -110,6 +95,14 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   ],
                 ),
               ],
+              builder: (BuildContext context, GoRouterState state, _) {
+                final StatefulShellRouteState shellRouteState =
+                    StatefulShellRoute.of(context);
+                return TabScreen(
+                  index: shellRouteState.index,
+                  navigators: shellRouteState.navigators,
+                );
+              },
             ),
           ),
           ShellRouteBranch(
@@ -148,6 +141,15 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
         //     (BuildContext context, GoRouterState state, Widget statefulShell) {
         //   return NoTransitionPage<dynamic>(child: statefulShell);
         // },
+        builder: (BuildContext context, GoRouterState state,
+            Widget navigationContainer) {
+          final StatefulShellRouteState shellRouteState =
+              StatefulShellRoute.of(context);
+          return ScaffoldWithNavBar(
+            index: shellRouteState.index,
+            navigators: shellRouteState.navigators,
+          );
+        },
       ),
     ],
   );
