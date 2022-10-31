@@ -52,7 +52,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   parentNavigatorKey: _tabANavigatorKey,
                   path: '/a',
                   builder: (BuildContext context, GoRouterState state) {
-                    debugPrint('### detected route: /a');
                     return const CounterView(
                       label: 'A',
                     );
@@ -64,7 +63,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     GoRoute(
                       path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
-                        debugPrint('### detected route: /a/result:count');
                         return ResultView(
                           label: 'A',
                           count: int.parse(state.params['count'] ?? '0'),
@@ -77,7 +75,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                   parentNavigatorKey: _tabBNavigatorKey,
                   path: '/b',
                   builder: (BuildContext context, GoRouterState state) {
-                    debugPrint('### detected route: /b');
                     return const CounterView(
                       label: 'B',
                     );
@@ -89,7 +86,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                     GoRoute(
                       path: 'result/:count',
                       builder: (BuildContext context, GoRouterState state) {
-                        debugPrint('### detected route: /b/result:count');
                         return ResultView(
                           label: 'B',
                           count: int.parse(state.params['count'] ?? '0'),
@@ -102,6 +98,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
               builder: (BuildContext context, GoRouterState state, _) {
                 final StatefulShellRouteState shellRouteState =
                     StatefulShellRoute.of(context);
+                debugPrint('### TabScreen.index: ${shellRouteState.index}');
                 return TabScreen(
                   index: shellRouteState.index,
                   branchState: shellRouteState.branchState,
@@ -117,7 +114,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
             rootRoute: GoRoute(
               path: '/c',
               builder: (BuildContext context, GoRouterState state) {
-                debugPrint('### detected route: /c');
                 return const CounterScreen(
                   label: 'C',
                 );
@@ -129,7 +125,6 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
                 GoRoute(
                   path: 'result/:count',
                   builder: (BuildContext context, GoRouterState state) {
-                    debugPrint('### detected route: /c/result:count');
                     return ResultScreen(
                       label: 'C',
                       count: int.parse(state.params['count'] ?? '0'),
@@ -151,6 +146,7 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
             Widget navigationContainer) {
           final StatefulShellRouteState shellRouteState =
               StatefulShellRoute.of(context);
+          debugPrint('### ScaffoldWithNavBar.index: ${shellRouteState.index}');
           return ScaffoldWithNavBar(
             index: shellRouteState.index,
             branchState: shellRouteState.branchState,
@@ -266,11 +262,11 @@ class _TabScreenState extends GoRouterShellStatefulWidgetState<TabScreen> {
             Tab(child: Text('Two')),
           ],
           onTap: (int index) {
-            if (index == 0) {
-              GoRouter.of(context).go('/a');
-            } else {
-              GoRouter.of(context).go('/b');
-            }
+            tabController.animateTo(
+              index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
           },
         ),
       ),
@@ -475,10 +471,9 @@ abstract class GoRouterShellStatefulWidgetState<
 
   void _tabListener() {
     if (tabController.index != index) {
-      index = tabController.index;
-      setState(() {});
       late String location;
-      final ShellRouteBranchState branchState = widget.branchState[index];
+      final ShellRouteBranchState branchState =
+          widget.branchState[tabController.index];
       final RouteBase rootRoute = branchState.routeBranch.rootRoute;
       if (rootRoute is GoRoute) {
         location = rootRoute.path;
@@ -489,22 +484,22 @@ abstract class GoRouterShellStatefulWidgetState<
         assert(false, 'No default location for branch');
         return;
       }
+      debugPrint('### Moving to $location');
       GoRouter.of(context).go(location);
     }
   }
 
   @override
   void didUpdateWidget(covariant T oldWidget) {
-    if (oldWidget.index != widget.index) {
-      if (widget.index != index) {
-        index = widget.index;
-        setState(() {});
-        tabController.animateTo(
-          widget.index,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
+    if (widget.index != oldWidget.index && widget.index != index) {
+      index = widget.index;
+      setState(() {});
+      debugPrint('### Animating to $index');
+      tabController.animateTo(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
     super.didUpdateWidget(oldWidget);
   }
