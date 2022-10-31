@@ -477,8 +477,14 @@ abstract class GoRouterShellStatefulWidgetState<
     if (tabController.index != index) {
       index = tabController.index;
       setState(() {});
-      final String? location =
-          widget.branchState[tabController.index].routeBranch.defaultLocation;
+      late String location;
+      final ShellRouteBranchState branchState = widget.branchState[index];
+      final RouteBase rootRoute = branchState.routeBranch.rootRoute;
+      if (rootRoute is GoRoute) {
+        location = rootRoute.path;
+      } else {
+        location = branchState.defaultLocation;
+      }
       if (location == null) {
         assert(false, 'No default location for branch');
         return;
