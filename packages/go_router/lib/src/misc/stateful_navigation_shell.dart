@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/widgets.dart';
 
 import '../configuration.dart';
+import '../matching.dart';
 import '../router.dart';
 import '../typedefs.dart';
 
@@ -29,6 +30,10 @@ class InheritedStatefulNavigationShell extends InheritedWidget {
   }
 }
 
+/// Builder function for a route branch navigator
+typedef ShellRouteBranchNavigatorBuilder = Navigator? Function(
+    BuildContext context, StatefulShellRouteState routeState, int branchIndex);
+
 /// Widget that manages and maintains the state of a [StatefulShellRoute],
 /// including the [Navigator]s of the configured route branches.
 ///
@@ -49,8 +54,10 @@ class StatefulNavigationShell extends StatefulWidget {
   const StatefulNavigationShell({
     required this.configuration,
     required this.shellRoute,
-    required this.activeNavigator,
     required this.shellGoRouterState,
+    required this.navigator,
+    required this.matchList,
+    required this.branchNavigatorBuilder,
     super.key,
   });
 
@@ -60,11 +67,17 @@ class StatefulNavigationShell extends StatefulWidget {
   /// The associated [StatefulShellRoute]
   final StatefulShellRoute shellRoute;
 
-  /// The navigator for the currently active tab
-  final Navigator activeNavigator;
-
-  /// The [GoRouterState] for navigation shell.
+  /// The [GoRouterState] for the navigation shell.
   final GoRouterState shellGoRouterState;
+
+  /// The navigator for the currently active route branch
+  final Navigator navigator;
+
+  /// The RouteMatchList for the current location
+  final RouteMatchList matchList;
+
+  /// Builder for route branch navigators (used for preloading).
+  final ShellRouteBranchNavigatorBuilder branchNavigatorBuilder;
 
   @override
   State<StatefulWidget> createState() => StatefulNavigationShellState();
@@ -77,13 +90,21 @@ class StatefulNavigationShellState extends State<StatefulNavigationShell> {
   int _findCurrentIndex() {
     final List<ShellRouteBranchState> branchState = _routeState.branchState;
     final int index = branchState.indexWhere((ShellRouteBranchState e) =>
-        e.routeBranch.navigatorKey == widget.activeNavigator.key);
+        e.routeBranch.navigatorKey == widget.navigator.key);
     return index < 0 ? 0 : index;
   }
 
-  void _go(String location, Object? extra) {
-    GoRouter.of(context).go(location, extra: extra);
+  void _switchActiveBranch(
+      ShellRouteBranchState branchState, RouteMatchList? matchList) {
+    if (matchList != null) {
+      GoRouter.of(context).routerDelegate.replaceMatchList(matchList);
+    } else {
+      GoRouter.of(context).go(branchState.defaultLocation);
+    }
   }
+
+  String _fullPathForRoute(RouteBase route) =>
+      widget.configuration.fullPathForRoute(route);
 
   @override
   void initState() {
@@ -91,11 +112,11 @@ class StatefulNavigationShellState extends State<StatefulNavigationShell> {
     final List<ShellRouteBranchState> branchState = widget.shellRoute.branches
         .map((ShellRouteBranch e) => ShellRouteBranchState(
               routeBranch: e,
-              rootRoutePath: widget.configuration.fullPathForRoute(e.rootRoute),
+              rootRoutePath: _fullPathForRoute(e.rootRoute),
             ))
         .toList();
     _routeState = StatefulShellRouteState(
-      go: _go,
+      switchActiveBranch: _switchActiveBranch,
       route: widget.shellRoute,
       branchState: branchState,
       index: 0,
@@ -116,17 +137,28 @@ class StatefulNavigationShellState extends State<StatefulNavigationShell> {
 
   void _updateRouteState() {
     final int currentIndex = _findCurrentIndex();
-    final GoRouter goRouter = GoRouter.of(context);
 
     final List<ShellRouteBranchState> branchState =
         _routeState.branchState.toList();
     branchState[currentIndex] = branchState[currentIndex].copy(
-      navigator: widget.activeNavigator,
-      lastLocation: goRouter.location,
+      navigator: widget.navigator,
+      matchList: widget.matchList,
     );
 
+    if (widget.shellRoute.preloadBranches) {
+      for (int i = 0; i < branchState.length; i++) {
+        if (i != currentIndex && branchState[i].navigator == null) {
+          final Navigator? navigator =
+              widget.branchNavigatorBuilder(context, _routeState, i);
+          branchState[i] = branchState[i].copy(
+            navigator: navigator,
+          );
+        }
+      }
+    }
+
     _routeState = StatefulShellRouteState(
-      go: _go,
+      switchActiveBranch: _switchActiveBranch,
       route: widget.shellRoute,
       branchState: branchState,
       index: currentIndex,
@@ -140,7 +172,7 @@ class StatefulNavigationShellState extends State<StatefulNavigationShell> {
       child: Builder(builder: (BuildContext context) {
         // This Builder Widget is mainly used to make it possible to access the
         // StatefulShellRouteState via the BuildContext in the ShellRouteBuilder
-        final ShellRouteBuilder shellRouteBuilder = widget.shellRoute.builder;
+        final ShellRouteBuilder shellRouteBuilder = widget.shellRoute.builder!;
         return shellRouteBuilder(
           context,
           widget.shellGoRouterState,

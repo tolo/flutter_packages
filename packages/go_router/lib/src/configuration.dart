@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 
 import 'configuration.dart';
 import 'logging.dart';
+import 'matching.dart';
 import 'path_utils.dart';
 import 'typedefs.dart';
 
@@ -96,6 +97,37 @@ class RouteConfiguration {
 
       checkParentNavigatorKeys(
           routes, <GlobalKey<NavigatorState>>[navigatorKey]);
+
+      void checkShellRouteBranchDefaultLocations(
+          List<RouteBase> routes, RouteMatcher matcher) {
+        try {
+          for (final RouteBase route in routes) {
+            if (route is StatefulShellRoute) {
+              for (final ShellRouteBranch branch in route.branches) {
+                if (branch.defaultLocation == null) {
+                  continue;
+                }
+                final RouteMatchList matchList =
+                    matcher.findMatch(branch.defaultLocation!);
+                assert(
+                    matchList.isNotEmpty,
+                    'defaultLocation '
+                    '(${branch.defaultLocation}) of ShellRouteBranch must be a '
+                    'valid location');
+              }
+            }
+            checkShellRouteBranchDefaultLocations(route.routes, matcher);
+          }
+        } on MatcherError catch (e) {
+          assert(
+              false,
+              'defaultLocation (${e.location}) of ShellRouteBranch must '
+              'be a valid location');
+        }
+      }
+
+      checkShellRouteBranchDefaultLocations(routes, RouteMatcher(this));
+
       return true;
     }());
   }
@@ -179,40 +211,6 @@ class RouteConfiguration {
       }
     }
     return null;
-  }
-
-  /// Finds the root route of closest ShellRouteBranch ancestor of the provided
-  /// route.
-  RouteBase? findAncestorShellRouteBranchRoute<T extends RouteBase>(
-      RouteBase route) {
-    final List<RouteBase> ancestors = _ancestorsForRoute(route, routes);
-    final int shellRouteIndex =
-        ancestors.lastIndexWhere((RouteBase e) => e is StatefulShellRoute);
-    if (shellRouteIndex >= 0 && shellRouteIndex < (ancestors.length - 1)) {
-      return ancestors[shellRouteIndex + 1];
-    }
-    return null;
-  }
-
-  /// Tests if a route is a descendant of an ancestor route.
-  bool isDescendantOf({required RouteBase ancestor, required RouteBase route}) {
-    return _ancestorsForRoute(route, routes).contains(ancestor);
-  }
-
-  static List<RouteBase> _ancestorsForRoute<T extends RouteBase>(
-      RouteBase targetRoute, List<RouteBase> routes) {
-    for (final RouteBase route in routes) {
-      if (route.routes.contains(targetRoute)) {
-        return <RouteBase>[route];
-      } else {
-        final List<RouteBase> ancestors =
-            _ancestorsForRoute(targetRoute, route.routes);
-        if (ancestors.isNotEmpty) {
-          return <RouteBase>[route, ...ancestors];
-        }
-      }
-    }
-    return <RouteBase>[];
   }
 
   @override

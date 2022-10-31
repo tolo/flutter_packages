@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:go_router/src/match.dart';
 import 'package:go_router/src/misc/error_screen.dart';
-import 'package:go_router/src/misc/errors.dart';
 
 Future<GoRouter> createGoRouter(
   WidgetTester tester, {
@@ -122,36 +121,22 @@ void main() {
     );
 
     testWidgets(
-      'It should throw GoError if pushing a route that is descendant of a '
-      'different StatefulShellRoute branch',
+      'It should successfully push a route from outside the the current '
+      'StatefulShellRoute',
       (WidgetTester tester) async {
         final GoRouter goRouter =
             await createGoRouterWithStatefulShellRoute(tester);
         goRouter.push('/c/c1');
         await tester.pumpAndSettle();
 
-        expect(
-          () => goRouter.push('/d/d1'),
-          throwsA(isA<GoError>()),
-        );
-        await tester.pumpAndSettle();
-      },
-    );
-
-    testWidgets(
-      'It should throw GoError if pushing a route that is not descendant of '
-      'the current StatefulShellRoute',
-      (WidgetTester tester) async {
-        final GoRouter goRouter =
-            await createGoRouterWithStatefulShellRoute(tester);
-        goRouter.push('/c/c1');
+        goRouter.push('/a');
         await tester.pumpAndSettle();
 
+        expect(goRouter.routerDelegate.matches.matches.length, 3);
         expect(
-          () => goRouter.push('/a'),
-          throwsA(isA<GoError>()),
+          goRouter.routerDelegate.matches.matches[2].pageKey,
+          const Key('/a-p1'),
         );
-        await tester.pumpAndSettle();
       },
     );
 
@@ -159,7 +144,8 @@ void main() {
       'It should successfully push a route that is a descendant of the current '
       'StatefulShellRoute branch',
       (WidgetTester tester) async {
-        final GoRouter goRouter = await createGoRouter(tester);
+        final GoRouter goRouter =
+            await createGoRouterWithStatefulShellRoute(tester);
         goRouter.push('/c/c1');
         await tester.pumpAndSettle();
 
@@ -170,6 +156,26 @@ void main() {
         expect(
           goRouter.routerDelegate.matches.matches[2].pageKey,
           const Key('/c/c2-p1'),
+        );
+      },
+    );
+
+    testWidgets(
+      'It should successfully push the root of the current StatefulShellRoute '
+      'branch upon itself',
+      (WidgetTester tester) async {
+        final GoRouter goRouter =
+            await createGoRouterWithStatefulShellRoute(tester);
+        goRouter.push('/c');
+        await tester.pumpAndSettle();
+
+        goRouter.push('/c');
+        await tester.pumpAndSettle();
+
+        expect(goRouter.routerDelegate.matches.matches.length, 3);
+        expect(
+          goRouter.routerDelegate.matches.matches[2].pageKey,
+          const Key('/c-p2'),
         );
       },
     );
