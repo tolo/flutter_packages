@@ -353,8 +353,30 @@ class CounterViewState extends State<CounterView> {
                 '${GoRouter.of(context).location}/result/$_counter',
               );
             },
-            child: const Text('Navigate'),
+            child: const Text('Show results'),
           ),
+          const Padding(padding: EdgeInsets.all(18)),
+          if (GoRouter.of(context).location != '/a') ...<Widget>[
+            const Padding(padding: EdgeInsets.all(4)),
+            TextButton(
+              onPressed: () => context.go('/a'),
+              child: const Text('Navigate to section A tab one'),
+            ),
+          ],
+          if (GoRouter.of(context).location != '/b') ...<Widget>[
+            const Padding(padding: EdgeInsets.all(4)),
+            TextButton(
+              onPressed: () => context.go('/b'),
+              child: const Text('Navigate to section A tab two'),
+            ),
+          ],
+          if (GoRouter.of(context).location != '/c') ...<Widget>[
+            const Padding(padding: EdgeInsets.all(4)),
+            TextButton(
+              onPressed: () => context.go('/c'),
+              child: const Text('Navigate to section B'),
+            ),
+          ],
         ],
       ),
     );
@@ -471,21 +493,7 @@ abstract class GoRouterShellStatefulWidgetState<
 
   void _tabListener() {
     if (tabController.index != index) {
-      late String location;
-      final ShellRouteBranchState branchState =
-          widget.branchState[tabController.index];
-      final RouteBase rootRoute = branchState.routeBranch.rootRoute;
-      if (rootRoute is GoRoute) {
-        location = rootRoute.path;
-      } else {
-        location = branchState.defaultLocation;
-      }
-      if (location == null) {
-        assert(false, 'No default location for branch');
-        return;
-      }
-      debugPrint('### Moving to $location');
-      GoRouter.of(context).go(location);
+      StatefulShellRoute.of(context).goBranch(tabController.index);
     }
   }
 
@@ -494,7 +502,6 @@ abstract class GoRouterShellStatefulWidgetState<
     if (widget.index != oldWidget.index && widget.index != index) {
       index = widget.index;
       setState(() {});
-      debugPrint('### Animating to $index');
       tabController.animateTo(
         index,
         duration: const Duration(milliseconds: 300),
