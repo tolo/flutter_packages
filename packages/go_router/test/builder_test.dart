@@ -115,18 +115,17 @@ void main() {
       final GoRouter goRouter = GoRouter(
         initialLocation: '/nested',
         routes: <RouteBase>[
-          StatefulShellRoute.rootRoutes(
-            builder:
-                (BuildContext context, GoRouterState state, Widget child) =>
-                    child,
-            routes: <GoRoute>[
-              GoRoute(
-                parentNavigatorKey: key,
-                path: '/nested',
-                builder: (BuildContext context, GoRouterState state) {
-                  return _DetailsScreen();
-                },
-              ),
+          StatefulShellRoute(
+            builder: (_, __, Widget child) => child,
+            branches: <ShellRouteBranch>[
+              ShellRouteBranch(navigatorKey: key, routes: <RouteBase>[
+                GoRoute(
+                  path: '/nested',
+                  builder: (BuildContext context, GoRouterState state) {
+                    return _DetailsScreen();
+                  },
+                ),
+              ]),
             ],
           ),
         ],
@@ -387,12 +386,14 @@ void main() {
               ShellRouteBranch(
                 navigatorKey: shellNavigatorKey,
                 restorationScopeId: 'scope1',
-                rootRoute: GoRoute(
-                  path: '/a',
-                  builder: (BuildContext context, GoRouterState state) {
-                    return _DetailsScreen();
-                  },
-                ),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: '/a',
+                    builder: (BuildContext context, GoRouterState state) {
+                      return _DetailsScreen();
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -457,10 +458,9 @@ class _BuilderTestWidget extends StatelessWidget {
       configuration: configuration,
       builderWithNav: (
         BuildContext context,
-        GoRouterState state,
-        Navigator navigator,
+        Widget child,
       ) {
-        return navigator;
+        return child;
       },
       errorPageBuilder: (
         BuildContext context,
@@ -484,8 +484,8 @@ class _BuilderTestWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: builder.tryBuild(
-          context, matches, () {}, false, routeConfiguration.navigatorKey),
+      home: builder.tryBuild(context, matches, () {}, false,
+          routeConfiguration.navigatorKey, <Page<Object?>, GoRouterState>{}),
       // builder: (context, child) => ,
     );
   }
