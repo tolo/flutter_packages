@@ -90,6 +90,16 @@ class RouteMatchList {
   /// The last matching route.
   RouteMatch get last => _matches.last;
 
+  /// A copy of the last matching route, updated to include all the path
+  /// parameters of the current matches.
+  RouteMatch get lastWithAllParams {
+    final Map<String, String> params = matches.fold(
+        <String, String>{},
+        (Map<String, String> p, RouteMatch e) =>
+            <String, String>{...p, ...e.encodedParams});
+    return last.copy(encodedParams: params);
+  }
+
   /// The route matches.
   List<RouteMatch> get matches => _matches;
 

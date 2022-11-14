@@ -52,14 +52,13 @@ FutureOr<RouteMatchList> redirect(
 
       // Merge new params to keep params from previously matched paths, e.g.
       // /users/:userId/book/:bookId provides userId and bookId to bookgit /:bookId
-      Map<String, String> previouslyMatchedParams = <String, String>{};
+      final Map<String, String> previouslyMatchedParams = <String, String>{};
       for (final RouteMatch match in prevMatchList.matches) {
         assert(
           !previouslyMatchedParams.keys.any(match.encodedParams.containsKey),
           'Duplicated parameter names',
         );
-        match.encodedParams.addAll(previouslyMatchedParams);
-        previouslyMatchedParams = match.encodedParams;
+        previouslyMatchedParams.addAll(match.encodedParams);
       }
       FutureOr<RouteMatchList> processRouteLevelRedirect(
           String? routeRedirectLocation) {
@@ -144,6 +143,10 @@ FutureOr<String?> _getRouteLevelRedirect(
   final RouteBase route = match.route;
   FutureOr<String?> routeRedirectResult;
   if (route is GoRoute && route.redirect != null) {
+    final Map<String, String> allMatchedParams = <String, String>{};
+    for (int i = 0; i <= currentCheckIndex; i++) {
+      allMatchedParams.addAll(matchList.matches[i].encodedParams);
+    }
     routeRedirectResult = route.redirect!(
       context,
       GoRouterState(
@@ -154,7 +157,7 @@ FutureOr<String?> _getRouteLevelRedirect(
         path: route.path,
         fullpath: match.fullpath,
         extra: match.extra,
-        params: match.decodedParams,
+        params: allMatchedParams,
         queryParams: match.queryParams,
         queryParametersAll: match.queryParametersAll,
       ),
