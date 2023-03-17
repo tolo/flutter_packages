@@ -141,7 +141,12 @@ class RouteConfiguration {
             if (branch.initialLocation == null) {
               // Recursively search for the first GoRoute descendant. Will
               // throw assertion error if not found.
-              findStatefulShellBranchDefaultLocation(branch);
+              final String? initialLocation =
+                  locationOfFirstGoRoute(branch.routes);
+              assert(
+                  initialLocation != null,
+                  'The initial location of a StatefulShellBranch must be derivable from '
+                  'GoRoute descendant');
             } else {
               final RouteBase initialLocationRoute =
                   matcher.findMatch(branch.initialLocation!).last.route;
@@ -185,17 +190,23 @@ class RouteConfiguration {
           {required RouteBase ancestor, required RouteBase route}) =>
       ancestor == route || routesRecursively(ancestor.routes).contains(route);
 
-  /// Recursively traverses the routes of the provided StatefulShellBranch to
-  /// find the first GoRoute, from which a full path will be derived.
-  String findStatefulShellBranchDefaultLocation(StatefulShellBranch branch) {
-    final GoRoute? route = _findFirstGoRoute(branch.routes);
-    final String? initialLocation =
-        route != null ? _fullPathForRoute(route, '', routes) : null;
-    assert(
-        initialLocation != null,
-        'The initial location of a StatefulShellBranch must be derivable from '
-        'GoRoute descendant');
-    return initialLocation!;
+  /// Recursively traverses the provided routes to find the first GoRoute, from
+  /// which a full path will be derived.
+  @visibleForTesting
+  String? locationOfFirstGoRoute(List<RouteBase> routes) {
+    final GoRoute? route = _findFirstGoRoute(routes);
+    return route != null ? _fullPathForRoute(route, '', this.routes) : null;
+  }
+
+  /// Finds the initial location for the specified shell navigator, either by
+  /// using the property [ShellNavigatorProperties.initialLocation], or by
+  /// finding the first [GoRoute] in the associated routes.
+  String initialShellNavigationLocation(
+      ShellNavigatorProperties shellNavigator) {
+    final String? location = shellNavigator.initialLocation ??
+        locationOfFirstGoRoute(shellNavigator.routes);
+    assert(location != null);
+    return location!;
   }
 
   static String? _fullPathForRoute(

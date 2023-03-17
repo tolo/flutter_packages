@@ -148,6 +148,39 @@ class RouteMatchList {
   }
 }
 
+class ShellRouteMatch extends RouteMatch {
+  /// Constructor for [ShellRouteMatch].
+  const ShellRouteMatch({
+    required ShellRouteBase route,
+    required super.subloc,
+    required super.extra,
+    required super.error,
+    required super.pageKey,
+    required this.preloadedNavigatorMatches,
+  }) : super(route: route);
+
+  @override
+  ShellRouteBase get route => super.route as ShellRouteBase;
+
+  final List<RouteMatchList> preloadedNavigatorMatches;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(other, this)) {
+      return true;
+    }
+    if (other is! ShellRouteMatch) {
+      return false;
+    }
+    return super == other &&
+        listEquals<RouteMatchList>(
+            other.preloadedNavigatorMatches, preloadedNavigatorMatches);
+  }
+
+  @override
+  int get hashCode => Object.hash(super.hashCode, preloadedNavigatorMatches);
+}
+
 /// Unmodifiable version of [RouteMatchList] that also supports equality
 /// checking based on data.
 @immutable

@@ -69,8 +69,8 @@ class RouteBuilder {
       <GlobalKey<NavigatorState>, HeroController>{};
 
   /// State for any active stateful shell routes
-  final Map<ShellRouteBase, Object?> _shellRouteState =
-      <ShellRouteBase, Object?>{};
+  final Map<ShellRouteBase, ShellState?> _shellRouteState =
+      <ShellRouteBase, ShellState?>{};
 
   /// Builds the top-level Navigator for the given [RouteMatchList].
   Widget build(
@@ -117,6 +117,7 @@ class RouteBuilder {
     Map<Page<Object?>, GoRouterState> registry,
   ) {
     final _PagePopContext pagePopContext = _PagePopContext._(onPopPage);
+    // TODO(tolo): builderWithNav seems to be called twice - remove call here?
     return builderWithNav(
       context,
       _buildNavigator(
@@ -155,22 +156,30 @@ class RouteBuilder {
         _buildErrorPage(context, e, matchList),
       ];
     } finally {
+      final Iterable<ShellRouteBase> shellRoutesIterator = matchList.matches
+          .map((RouteMatch e) => e.route)
+          .whereType<ShellRouteBase>();
+      final Set<ShellRouteBase> shellRoutes =
+          RouteConfiguration.routesRecursively(shellRoutesIterator)
+              .whereType<ShellRouteBase>()
+              .toSet();
+
+      final Iterable<ShellNavigatorProperties> statefulShellNavigators =
+          shellRoutes
+              .expand((ShellRouteBase e) => e.statefulShellNavigatorProperties);
+
       /// Clean up previous cache to prevent memory leak.
+      final Set<Key> activeKeys = keyToPage.keys.toSet()
+        ..addAll(statefulShellNavigators
+            .map((ShellNavigatorProperties e) => e.navigatorKey));
       _goHeroCache.removeWhere(
-          (GlobalKey<NavigatorState> key, _) => !keyToPage.keys.contains(key));
+          (GlobalKey<NavigatorState> key, _) => !activeKeys.contains(key));
 
       /// Clean up cache of shell route states, but keep states for shell routes
       /// in the current match list, as well as in any nested stateful shell
       /// routes
-      if (_shellRouteState.isNotEmpty) {
-        Iterable<ShellRouteBase> shellRoutes = matchList.matches
-            .map((RouteMatch e) => e.route)
-            .whereType<ShellRouteBase>();
-        shellRoutes = RouteConfiguration.routesRecursively(shellRoutes)
-            .whereType<ShellRouteBase>();
-        _shellRouteState
-            .removeWhere((ShellRouteBase key, _) => !shellRoutes.contains(key));
-      }
+      _shellRouteState
+          .removeWhere((ShellRouteBase key, _) => !shellRoutes.contains(key));
     }
   }
 
@@ -210,8 +219,9 @@ class RouteBuilder {
       _buildRecursive(context, matchList, startIndex + 1, pagePopContext,
           routerNeglect, keyToPages, navigatorKey, registry);
     } else if (route is ShellRouteBase) {
-      assert(startIndex + 1 < matchList.matches.length,
-          'Shell routes must always have child routes');
+      final int subRouteIndex = startIndex + 1;
+      assert(subRouteIndex < matchList.matches.length,
+          'Shell routes must always have sub-routes');
       // The key for the Navigator that will display this ShellRoute's page.
       final GlobalKey<NavigatorState> parentNavigatorKey = navigatorKey;
 
@@ -224,7 +234,7 @@ class RouteBuilder {
       final int shellPageIdx = keyToPages[parentNavigatorKey]!.length;
 
       // Get the current sub-route of this shell route from the match list.
-      final RouteBase subRoute = matchList.matches[startIndex + 1].route;
+      final RouteBase subRoute = matchList.matches[subRouteIndex].route;
 
       // The key to provide to the shell route's Navigator.
       final GlobalKey<NavigatorState> shellNavigatorKey =
@@ -234,38 +244,69 @@ class RouteBuilder {
       keyToPages.putIfAbsent(shellNavigatorKey, () => <Page<Object?>>[]);
 
       // Build the remaining pages
-      _buildRecursive(context, matchList, startIndex + 1, pagePopContext,
+      _buildRecursive(context, matchList, subRouteIndex, pagePopContext,
           routerNeglect, keyToPages, shellNavigatorKey, registry);
 
-      final HeroController heroController = _goHeroCache.putIfAbsent(
-          shellNavigatorKey, () => _getHeroController(context));
+      final Map<GlobalKey<NavigatorState>, RouteMatchList> preloadedMatchLists =
+          <GlobalKey<NavigatorState>, RouteMatchList>{};
+      if (match is ShellRouteMatch &&
+          match.preloadedNavigatorMatches.isNotEmpty) {
+        // Build the pages for the preload routes
+        for (final RouteMatchList preloadMatchList
+            in match.preloadedNavigatorMatches) {
+          final RouteBase preloadSubRoute =
+              preloadMatchList.matches[subRouteIndex].route;
+          if (preloadSubRoute == subRoute) {
+            continue;
+          }
+          final GlobalKey<NavigatorState> preloadNavigatorKey =
+              route.navigatorKeyForSubRoute(preloadSubRoute);
+          _buildRecursive(
+              context,
+              preloadMatchList,
+              subRouteIndex,
+              pagePopContext,
+              routerNeglect,
+              keyToPages,
+              preloadNavigatorKey,
+              registry);
+          preloadedMatchLists[preloadNavigatorKey] = preloadMatchList;
+        }
+      }
 
       // Build the Navigator for this shell route
       Widget buildShellNavigator(
-          List<NavigatorObserver>? observers, String? restorationScopeId) {
+          GlobalKey<NavigatorState> navigatorKey,
+          List<Page<Object?>> pages,
+          List<NavigatorObserver>? observers,
+          String? restorationScopeId) {
+        final HeroController heroController = _goHeroCache.putIfAbsent(
+            navigatorKey, () => _getHeroController(context));
+
         return _buildNavigator(
           pagePopContext.onPopPage,
-          keyToPages[shellNavigatorKey]!,
-          shellNavigatorKey,
+          pages,
+          navigatorKey,
           observers: observers,
           restorationScopeId: restorationScopeId,
           heroController: heroController,
         );
       }
 
-      ShellRouteContext shellRouteContext = ShellRouteContext(
+      final ShellRouteContext shellRouteContext = ShellRouteContext(
         subRoute: subRoute,
-        routeMatchList: matchList,
+        matchList: matchList,
+        preloadedMatchLists: preloadedMatchLists,
+        navigatorKey: shellNavigatorKey,
+        keyToPages: keyToPages,
         shellRouteState: _shellRouteState[route],
         navigatorBuilder: buildShellNavigator,
       );
 
       // Call the ShellRouteBase to create/update the shell route state
-      final Object? shellRouteState =
+      shellRouteContext.shellRouteState =
           route.updateShellState(context, state, shellRouteContext);
-      _shellRouteState[route] = shellRouteState;
-      shellRouteContext =
-          shellRouteContext.copyWith(shellRouteState: shellRouteState);
+      _shellRouteState[route] = shellRouteContext.shellRouteState;
 
       // Build the Page for this route
       final Page<Object?> page = _buildPageForRoute(

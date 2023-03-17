@@ -99,6 +99,10 @@ class NestedTabNavigationExampleApp extends StatelessWidget {
 
           /// The route branch for the third tab of the bottom navigation bar.
           StatefulShellBranch(
+            /// To enable preloading of the initial locations of branches, pass
+            /// true for the parameter preload.
+            preload: true,
+
             /// StatefulShellBranch will automatically use the first descendant
             /// GoRoute as the initial location of the branch. If another route
             /// is desired, specify the location of it using the defaultLocation
@@ -271,7 +275,8 @@ class RootScreen extends StatelessWidget {
             const Padding(padding: EdgeInsets.all(4)),
             TextButton(
               onPressed: () {
-                GoRouter.of(context).go(detailsPath, extra: '$label-XYZ');
+                GoRouter.of(context, watch: false)
+                    .go(detailsPath, extra: '$label-XYZ');
               },
               child: const Text('View details'),
             ),
@@ -279,14 +284,14 @@ class RootScreen extends StatelessWidget {
             if (secondDetailsPath != null)
               TextButton(
                 onPressed: () {
-                  GoRouter.of(context).go(secondDetailsPath!);
+                  GoRouter.of(context, watch: false).go(secondDetailsPath!);
                 },
                 child: const Text('View more details'),
               ),
             const Padding(padding: EdgeInsets.all(8)),
             ElevatedButton(
               onPressed: () {
-                GoRouter.of(context).push('/modal');
+                GoRouter.of(context, watch: false).push('/modal');
               },
               child: const Text('Show modal screen on ROOT navigator'),
             ),
@@ -413,7 +418,7 @@ class DetailsScreenState extends State<DetailsScreen> {
             const Padding(padding: EdgeInsets.all(16)),
             TextButton(
               onPressed: () {
-                GoRouter.of(context).pop();
+                GoRouter.of(context, watch: false).pop();
               },
               child: const Text('< Back',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -444,7 +449,7 @@ class ModalScreen extends StatelessWidget {
             const Padding(padding: EdgeInsets.all(8)),
             ElevatedButton(
               onPressed: () {
-                GoRouter.of(context).go('/a');
+                GoRouter.of(context, watch: false).go('/a');
               },
               child: const Text('Go to initial section'),
             ),
@@ -507,6 +512,11 @@ class TabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    /// If preloading is enabled on the top StatefulShellRoute, this will be
+    /// printed directly after the app has been started, but only for the route
+    /// that is the initial location ('/c1')
+    debugPrint('Building TabScreen - $label');
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -516,7 +526,7 @@ class TabScreen extends StatelessWidget {
           if (detailsPath != null)
             TextButton(
               onPressed: () {
-                GoRouter.of(context).go(detailsPath!);
+                GoRouter.of(context, watch: false).go(detailsPath!);
               },
               child: const Text('View details'),
             ),

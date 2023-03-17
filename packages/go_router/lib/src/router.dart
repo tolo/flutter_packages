@@ -183,25 +183,25 @@ class GoRouter extends ChangeNotifier implements RouterConfig<RouteMatchList> {
         RouteInformation(location: location, state: extra);
   }
 
-  /// Navigate to the last location of the [StatefulShellBranch] at the provided
-  /// index in the associated [StatefulShellBranch].
+  /// Navigate to the last location of the nested shell navigator represented by
+  /// the provided [ShellNavigatorProperties].
   ///
-  /// If the branch has not been visited before, this method will navigate to
-  /// initial location of the branch. Consider using
-  /// [StatefulShellRouteState.goBranch] as a more convenient alternative to
-  /// this method.
-  void goBranch(int index, StatefulShellRouteState shellState) {
-    assert(index >= 0 && index < shellState.route.branches.length);
-    final RouteMatchList? matchlist = shellState.matchListForBranch(index);
+  /// If the shell navigator has not been visited before, this method will
+  /// navigate to initial location of the [ShellNavigatorProperties]. For
+  /// [StatefulShellRoute], consider using [StatefulShellRouteState.goBranch] as
+  /// a more convenient alternative to this method.
+  void goShellNavigator(
+      ShellNavigatorProperties shellNavigator, ShellState shellState) {
+    final RouteMatchList? matchlist =
+        shellState.currentLocation(shellNavigator);
     if (matchlist != null) {
       _routeInformationProvider.value = PreParsedRouteInformation(
           location: matchlist.uri.toString(),
           state: matchlist.extra,
           matchlist: matchlist);
     } else {
-      final StatefulShellBranch branch = shellState.route.branches[index];
-      final String initialLocation = branch.initialLocation ??
-          _routeConfiguration.findStatefulShellBranchDefaultLocation(branch);
+      final String initialLocation =
+          _routeConfiguration.initialShellNavigationLocation(shellNavigator);
       go(initialLocation);
     }
   }
@@ -312,9 +312,16 @@ class GoRouter extends ChangeNotifier implements RouterConfig<RouteMatchList> {
   }
 
   /// Find the current GoRouter in the widget tree.
-  static GoRouter of(BuildContext context) {
-    final InheritedGoRouter? inherited =
-        context.dependOnInheritedWidgetOfExactType<InheritedGoRouter>();
+  static GoRouter of(BuildContext context, {bool watch = true}) {
+    final InheritedGoRouter? inherited;
+    if (watch) {
+      inherited =
+          context.dependOnInheritedWidgetOfExactType<InheritedGoRouter>();
+    } else {
+      final InheritedElement? element =
+          context.getElementForInheritedWidgetOfExactType<InheritedGoRouter>();
+      inherited = element?.widget as InheritedGoRouter?;
+    }
     assert(inherited != null, 'No GoRouter found in context');
     return inherited!.goRouter;
   }

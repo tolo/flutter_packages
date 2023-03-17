@@ -60,4 +60,7 @@ typedef GoRouterRedirect = FutureOr<String?> Function(
 
 /// Signature for functions used to build Navigators
 typedef NavigatorBuilder = Widget Function(
-    List<NavigatorObserver>? observers, String? restorationScopeId);
+    GlobalKey<NavigatorState> navigatorKey,
+    List<Page<Object?>> pages,
+    List<NavigatorObserver>? observers,
+    String? restorationScopeId);

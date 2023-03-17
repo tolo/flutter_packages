@@ -345,13 +345,43 @@ abstract class ShellRouteBase extends RouteBase {
   /// immediate sub-route of this shell route.
   GlobalKey<NavigatorState> navigatorKeyForSubRoute(RouteBase subRoute);
 
+  List<ShellNavigatorProperties> get statefulShellNavigatorProperties =>
+      <ShellNavigatorProperties>[];
+
   /// Creates or updates an optional state object to be associated with an
   /// active shell route.
   ///
   /// The existing state can be accessed via [ShellRouteContext.shellRouteState].
-  Object? updateShellState(BuildContext context, GoRouterState state,
+  ShellState? updateShellState(BuildContext context, GoRouterState state,
           ShellRouteContext shellRouteContext) =>
       null;
+}
+
+/// Representing a navigation branch of a shell route.
+abstract class ShellNavigatorProperties {
+  /// The [GlobalKey] to be used by the [Navigator] built for this object.
+  GlobalKey<NavigatorState> get navigatorKey;
+
+  /// Whether this shell navigator should be preloaded when the associated
+  /// [StatefulShellRoute] is visited for the first time.
+  bool get preload;
+
+  /// The initial location for this shell navigator.
+  ///
+  /// This is used when the navigator is visited for the time and when preloading.
+  String? get initialLocation;
+
+  /// The associated routes.
+  List<RouteBase> get routes;
+}
+
+abstract class ShellState {
+  /// Gets the [RouteMatchList] representing the current location of the
+  /// provided shell navigator.
+  RouteMatchList? currentLocation(ShellNavigatorProperties shellNavigator);
+
+  /// Whether the provided shell navigator has been loaded.
+  bool isLoaded(ShellNavigatorProperties shellNavigator);
 }
 
 /// Context object used when building the shell and Navigator for a shell route.
@@ -359,42 +389,41 @@ class ShellRouteContext {
   /// Constructs a [ShellRouteContext].
   ShellRouteContext({
     required this.subRoute,
-    required this.routeMatchList,
+    required this.matchList,
+    required this.preloadedMatchLists,
+    required this.navigatorKey,
+    required this.keyToPages,
     required this.shellRouteState,
     required this.navigatorBuilder,
   });
-
-  /// Constructs a copy of this [ShellRouteContext], with updated values for
-  /// some of the fields.
-  ShellRouteContext copyWith({
-    Object? shellRouteState,
-  }) {
-    return ShellRouteContext(
-      subRoute: subRoute,
-      routeMatchList: routeMatchList,
-      shellRouteState: shellRouteState ?? this.shellRouteState,
-      navigatorBuilder: navigatorBuilder,
-    );
-  }
 
   /// The current immediate sub-route of the associated shell route.
   final RouteBase subRoute;
 
   /// The route match list for the current route.
-  final RouteMatchList routeMatchList;
+  final RouteMatchList matchList;
+
+  final Map<GlobalKey<NavigatorState>, RouteMatchList> preloadedMatchLists;
+
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  final Map<GlobalKey<NavigatorState>, List<Page<Object?>>> keyToPages;
 
   /// An optional state object associated with the shell route.
-  final Object? shellRouteState;
+  ShellState? shellRouteState;
 
   /// The navigator builder.
   final NavigatorBuilder navigatorBuilder;
 
   /// Builds the [Navigator] for the current route.
   Widget buildNavigator({
+    GlobalKey<NavigatorState>? navigatorKey,
     List<NavigatorObserver>? observers,
     String? restorationScopeId,
   }) {
     return navigatorBuilder(
+      navigatorKey ?? this.navigatorKey,
+      keyToPages[navigatorKey ?? this.navigatorKey]!,
       observers,
       restorationScopeId,
     );
@@ -774,27 +803,28 @@ class StatefulShellRoute extends ShellRouteBase {
   }
 
   @override
-  Object? updateShellState(BuildContext context, GoRouterState state,
+  ShellState? updateShellState(BuildContext context, GoRouterState state,
       ShellRouteContext shellRouteContext) {
     // Make sure branch state (locations) is copied over from previous state
     final StatefulShellRouteState? previousState =
         shellRouteContext.shellRouteState as StatefulShellRouteState?;
-    final Map<StatefulShellBranch, UnmodifiableRouteMatchList> branchState =
-        previousState?._branchState ??
-            <StatefulShellBranch, UnmodifiableRouteMatchList>{};
-
     final GlobalKey<NavigatorState> navigatorKey =
         navigatorKeyForSubRoute(shellRouteContext.subRoute);
     final StatefulShellRouteState shellRouteState = StatefulShellRouteState._(
-        GoRouter.maybeOf(context),
-        this,
-        state,
-        navigatorKey,
-        shellRouteContext,
-        branchState);
+      GoRouter.maybeOf(context),
+      this,
+      state,
+      navigatorKey,
+      shellRouteContext,
+      previousState?._branchState,
+    );
 
     return shellRouteState;
   }
+
+  @override
+  List<ShellNavigatorProperties> get statefulShellNavigatorProperties =>
+      branches;
 
   @override
   GlobalKey<NavigatorState> navigatorKeyForSubRoute(RouteBase subRoute) {
@@ -850,7 +880,7 @@ class StatefulShellRoute extends ShellRouteBase {
 /// Navigator needs to be accessed elsewhere. If no key is provided, a default
 /// one will be created.
 @immutable
-class StatefulShellBranch {
+class StatefulShellBranch extends ShellNavigatorProperties {
   /// Constructs a [StatefulShellBranch].
   StatefulShellBranch({
     required this.routes,
@@ -858,6 +888,7 @@ class StatefulShellBranch {
     this.initialLocation,
     this.restorationScopeId,
     this.observers,
+    this.preload = false,
   }) : navigatorKey = navigatorKey ?? GlobalKey<NavigatorState>();
 
   /// The [GlobalKey] to be used by the [Navigator] built for this branch.
@@ -866,9 +897,11 @@ class StatefulShellBranch {
   /// [StatefulShellRoute] and this key will be used to identify the Navigator.
   /// The routes associated with this branch will be placed o onto that
   /// Navigator instead of the root Navigator.
+  @override
   final GlobalKey<NavigatorState> navigatorKey;
 
   /// The list of child routes associated with this route branch.
+  @override
   final List<RouteBase> routes;
 
   /// The initial location for this route branch.
@@ -878,7 +911,20 @@ class StatefulShellBranch {
   /// location is used when loading the branch for the first time (for instance
   /// when switching branch using the goBranch method in
   /// [StatefulShellRouteState]).
+  @override
   final String? initialLocation;
+
+  /// Whether this route branch should be preloaded when the associated
+  /// [StatefulShellRoute] is visited for the first time.
+  ///
+  /// If this is true, this branch will be preloaded by navigating to
+  /// the initial location (see [initialLocation]). The primary purpose of
+  /// branch preloading is to enhance the user experience when switching
+  /// branches, which might for instance involve preparing the UI for animated
+  /// transitions etc. Care must be taken to **keep the preloading to an
+  /// absolute minimum** to avoid any unnecessary resource use.
+  @override
+  final bool preload;
 
   /// Restoration ID to save and restore the state of the navigator, including
   /// its history.
@@ -954,6 +1000,29 @@ class _StatefulNavigationShellState extends State<StatefulNavigationShell> {
         : _branchNavigators.remove(branch.navigatorKey);
   }
 
+  void _preloadBranches() {
+    final ShellRouteContext shellRouteContext = shellState._shellRouteContext;
+
+    final Map<GlobalKey<NavigatorState>, RouteMatchList> preloadedMatchLists =
+        shellRouteContext.preloadedMatchLists;
+
+    for (final StatefulShellBranch branch in _route.branches) {
+      final RouteMatchList? matchList =
+          preloadedMatchLists[branch.navigatorKey];
+      if (matchList != null && !shellState.isLoaded(branch)) {
+        final Widget navigator = shellRouteContext.buildNavigator(
+          navigatorKey: branch.navigatorKey,
+          observers: branch.observers,
+          restorationScopeId: branch.restorationScopeId,
+        );
+
+        _setNavigatorForBranch(branch, navigator);
+        shellState._updateBranchState(
+            branch, matchList.unmodifiableMatchList());
+      }
+    }
+  }
+
   void _updateCurrentBranchStateFromWidget() {
     final StatefulShellBranch branch = _route.branches[shellState.currentIndex];
     final ShellRouteContext shellRouteContext = shellState._shellRouteContext;
@@ -962,7 +1031,7 @@ class _StatefulNavigationShellState extends State<StatefulNavigationShell> {
     /// mutations from affecting the copy saved as the current state for this
     /// branch.
     final UnmodifiableRouteMatchList currentBranchState =
-        shellRouteContext.routeMatchList.unmodifiableMatchList();
+        shellRouteContext.matchList.unmodifiableMatchList();
 
     final UnmodifiableRouteMatchList? previousBranchState =
         shellState._stateForBranch(branch);
@@ -977,6 +1046,8 @@ class _StatefulNavigationShellState extends State<StatefulNavigationShell> {
       _setNavigatorForBranch(branch, currentNavigator);
       shellState._updateBranchState(branch, currentBranchState);
     }
+
+    _preloadBranches();
   }
 
   @override
@@ -1065,7 +1136,7 @@ class _IndexedStackedRouteBranchContainer extends StatelessWidget {
 /// this object should not be cached, but instead passed down from the builder
 /// functions of StatefulShellRoute.
 @immutable
-class StatefulShellRouteState {
+class StatefulShellRouteState extends ShellState {
   /// Constructs a [_StatefulShellRouteState].
   StatefulShellRouteState._(
     this._router,
@@ -1073,8 +1144,10 @@ class StatefulShellRouteState {
     this.routerState,
     GlobalKey<NavigatorState> currentNavigatorKey,
     this._shellRouteContext,
-    this._branchState,
-  ) : currentIndex = _indexOfBranchNavigatorKey(route, currentNavigatorKey);
+    Map<StatefulShellBranch, UnmodifiableRouteMatchList>? branchState,
+  )   : currentIndex = _indexOfBranchNavigatorKey(route, currentNavigatorKey),
+        _branchState =
+            branchState ?? <StatefulShellBranch, UnmodifiableRouteMatchList>{};
 
   static int _indexOfBranchNavigatorKey(
       StatefulShellRoute route, GlobalKey<NavigatorState> navigatorKey) {
@@ -1111,13 +1184,15 @@ class StatefulShellRouteState {
       _branchState[branch] = matchList;
 
   UnmodifiableRouteMatchList? _stateForBranch(StatefulShellBranch branch) =>
-      _branchState[branch];
+      _branchState[branch.navigatorKey];
 
-  /// Gets the [RouteMatchList] representing the current location of the branch
-  /// with the provided index.
-  RouteMatchList? matchListForBranch(int index) {
-    return _stateForBranch(route.branches[index])?.modifiableMatchList;
-  }
+  @override
+  RouteMatchList? currentLocation(ShellNavigatorProperties shellNavigator) =>
+      _branchState[shellNavigator]?.modifiableMatchList;
+
+  @override
+  bool isLoaded(ShellNavigatorProperties shellNavigator) =>
+      _branchState[shellNavigator] != null;
 
   /// Navigate to the last location of the [StatefulShellBranch] at the provided
   /// index in the associated [StatefulShellBranch].
@@ -1128,6 +1203,7 @@ class StatefulShellRouteState {
   /// [StatefulShellBranch.initialLocation]).
   void goBranch({required int index}) {
     assert(_router != null);
-    _router!.goBranch(index, this);
+    assert(index >= 0 && index < route.branches.length);
+    _router!.goShellNavigator(route.branches[index], this);
   }
 }

@@ -546,10 +546,9 @@ void main() {
           },
         );
 
-        expect('/a', config.findStatefulShellBranchDefaultLocation(branchA));
-        expect(
-            '/a/x/y1', config.findStatefulShellBranchDefaultLocation(branchY));
-        expect('/b1', config.findStatefulShellBranchDefaultLocation(branchB));
+        expect('/a', config.locationOfFirstGoRoute(branchA.routes));
+        expect('/a/x/y1', config.locationOfFirstGoRoute(branchY.routes));
+        expect('/b1', config.locationOfFirstGoRoute(branchB.routes));
       },
     );
 

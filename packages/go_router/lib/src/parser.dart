@@ -11,6 +11,7 @@ import 'configuration.dart';
 import 'delegate.dart';
 import 'information_provider.dart';
 import 'logging.dart';
+import 'match.dart';
 import 'matching.dart';
 import 'redirection.dart';
 
@@ -69,18 +70,6 @@ class GoRouteInformationParser extends RouteInformationParser<RouteMatchList> {
       // still try to process the top-level redirects.
       initialMatches = RouteMatchList.empty;
     }
-    return processRedirection(initialMatches, context,
-        topRouteInformation: routeInformation);
-  }
-
-  /// Processes any redirections for the provided RouteMatchList.
-  Future<RouteMatchList> processRedirection(
-      RouteMatchList routeMatchList, BuildContext context,
-      {RouteInformation? topRouteInformation}) {
-    final RouteInformation routeInformation = topRouteInformation ??
-        RouteInformation(
-            location: routeMatchList.uri.toString(),
-            state: routeMatchList.extra);
     Future<RouteMatchList> processRedirectorResult(RouteMatchList matches) {
       if (matches.isEmpty) {
         return SynchronousFuture<RouteMatchList>(errorScreen(
@@ -88,12 +77,13 @@ class GoRouteInformationParser extends RouteInformationParser<RouteMatchList> {
             MatcherError('no routes for location', routeInformation.location!)
                 .toString()));
       }
+      matches = _processShellNavigatorPreload(matches);
       return SynchronousFuture<RouteMatchList>(matches);
     }
 
     final FutureOr<RouteMatchList> redirectorResult = redirector(
       context,
-      SynchronousFuture<RouteMatchList>(routeMatchList),
+      SynchronousFuture<RouteMatchList>(initialMatches),
       configuration,
       matcher,
       extra: routeInformation.state,
@@ -103,6 +93,61 @@ class GoRouteInformationParser extends RouteInformationParser<RouteMatchList> {
     }
 
     return debugParserFuture = redirectorResult.then(processRedirectorResult);
+  }
+
+  final Map<GlobalKey<NavigatorState>, RouteMatchList>
+      _shellNavigatorPreloadMatchListCache =
+      <GlobalKey<NavigatorState>, RouteMatchList>{};
+
+  RouteMatchList? _parsePreloadMatchList(
+      ShellNavigatorProperties shellNavigator, ShellRouteMatch match) {
+    final String location =
+        matcher.configuration.initialShellNavigationLocation(shellNavigator);
+    RouteMatchList preloadMatches = matcher.findMatch(location);
+
+    // Make sure the same shell route is present in the preloaded
+    // match list
+    final int parentShellRouteIndex = preloadMatches.matches
+        .indexWhere((RouteMatch e) => e.route == match.route);
+    if (parentShellRouteIndex >= 0 &&
+        parentShellRouteIndex < (preloadMatches.matches.length - 1)) {
+      // Process nested preload
+      preloadMatches = _processShellNavigatorPreload(
+          preloadMatches, parentShellRouteIndex + 1);
+      _shellNavigatorPreloadMatchListCache[shellNavigator.navigatorKey] =
+          preloadMatches;
+      return preloadMatches;
+    }
+    return null;
+  }
+
+  RouteMatchList _processShellNavigatorPreload(RouteMatchList matchList,
+      [int startIndex = 0]) {
+    for (int i = startIndex; i < matchList.matches.length; i++) {
+      final RouteMatch match = matchList.matches[i];
+      if (match is! ShellRouteMatch) {
+        continue;
+      }
+      final List<ShellNavigatorProperties> shellNavigators =
+          match.route.statefulShellNavigatorProperties;
+      final List<RouteMatchList> preloadMatchLists = <RouteMatchList>[];
+      for (final ShellNavigatorProperties shellNavigator in shellNavigators) {
+        // Preload shell navigator if preload is enabled (i.e. parse route match
+        // list for nested navigators)
+        if (shellNavigator.preload) {
+          final RouteMatchList? preloadMatches =
+              _shellNavigatorPreloadMatchListCache[
+                      shellNavigator.navigatorKey] ??
+                  _parsePreloadMatchList(shellNavigator, match);
+          if (preloadMatches != null) {
+            preloadMatchLists.add(preloadMatches);
+          }
+        }
+      }
+      match.preloadedNavigatorMatches.addAll(preloadMatchLists);
+    }
+
+    return matchList;
   }
 
   @override

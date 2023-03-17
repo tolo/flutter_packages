@@ -30,12 +30,14 @@ class RouteMatch {
     required Object? extra,
   }) {
     if (route is ShellRouteBase) {
-      return RouteMatch(
+      final List<RouteMatchList> preloadedNavigatorMatches = <RouteMatchList>[];
+      return ShellRouteMatch(
         route: route,
         subloc: restLoc,
         extra: extra,
         error: null,
         pageKey: ValueKey<String>(route.hashCode.toString()),
+        preloadedNavigatorMatches: preloadedNavigatorMatches,
       );
     } else if (route is GoRoute) {
       assert(!route.path.contains('//'));

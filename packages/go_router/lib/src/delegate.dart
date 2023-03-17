@@ -294,6 +294,7 @@ class ImperativeRouteMatch extends RouteMatch {
     if (other is! ImperativeRouteMatch) {
       return false;
     }
+    // TODO(tolo): Shouldn't this be "super == other"?
     return super == this && other.matches == matches;
   }
 
